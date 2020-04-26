@@ -1,6 +1,12 @@
 import os
 import os.path
 
+from dotenv import load_dotenv
+
+
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
 # 取得したい講座のパラメータのリストを
 #  [kouzaname, language, kouza, kouzano]
 # の順で設定する
@@ -37,11 +43,11 @@ MP4URL = 'https://nhks-vh.akamaihd.net/i/gogaku-stream/mp4/{mp4file}/master.m3u8
 IMGURL = 'https://nhkbook.jp-east-2.storage.api.nifcloud.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'
 
 # 出力ディレクトリ
-OUTBASEDIR = '/mnt/hdd/raspberrypi/Music/NHK'
+OUTBASEDIR = os.environ.get('DB_FILE')
 # 一時保存用出力ディレクトリ
-TMPOUTDIR = '/mnt/hdd/raspberrypi/Music/TMP'
+TMPOUTDIR = os.environ.get('DB_FILE')
 # 作業ディレクトリ
-TMPBASEDIR = '/mnt/hdd/raspberrypi/.tmp'
+TMPBASEDIR = os.environ.get('DB_FILE')
 
 # rtmpdumpとffmpegのコマンド
 if os.name == 'nt':
