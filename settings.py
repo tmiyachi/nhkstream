@@ -43,11 +43,11 @@ MP4URL = 'https://nhks-vh.akamaihd.net/i/gogaku-stream/mp4/{mp4file}/master.m3u8
 IMGURL = 'https://nhkbook.jp-east-2.storage.api.nifcloud.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'
 
 # 出力ディレクトリ
-OUTBASEDIR = os.environ.get('DB_FILE')
+OUTBASEDIR = os.environ.get('OUTBASEDIR')
 # 一時保存用出力ディレクトリ
-TMPOUTDIR = os.environ.get('DB_FILE')
+TMPOUTDIR = os.environ.get('TMPOUTDIR')
 # 作業ディレクトリ
-TMPBASEDIR = os.environ.get('DB_FILE')
+TMPBASEDIR = os.environ.get('TMPBASEDIR')
 
 # rtmpdumpとffmpegのコマンド
 if os.name == 'nt':
