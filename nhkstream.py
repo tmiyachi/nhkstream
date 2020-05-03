@@ -6,6 +6,7 @@ import shutil
 import urllib.request
 from datetime import datetime
 from subprocess import STDOUT, check_call
+import sqlite3
 
 import requests
 from dateutil.relativedelta import relativedelta, MO, FR
@@ -16,9 +17,10 @@ from mutagen.mp3 import MP3
 
 from settings import KOUZALIST, OUTBASEDIR, TMPOUTDIR, TMPBASEDIR
 from settings import XMLURL, MP4URL, IMGURL
+from settings import USE_DB_TAG, DB_FILE
 from settings import ffmpeg
 
-from util import encodecmd
+from util import encodecmd, dict_factory
 
 
 # mp3ファイルにタグを保存する
@@ -146,6 +148,10 @@ def streamedump(kouzaname, language, kouza, kouzano):
         f.write(imgdata.read())
     imgdata.close()
 
+    if USE_DB_TAG:
+        con = sqlite3.connect(DB_FILE)
+        con.row_factory = dict_factory
+
     # mp4ファイルをダウンロードしてmp3にファイルに変換する
     FNULL = open(os.devnull, 'w')
     for number_on_week, (mp4file, date) in enumerate(zip(file_list, date_list)):
@@ -162,15 +168,29 @@ def streamedump(kouzaname, language, kouza, kouzano):
                 continue
         else:
             print('download ' + mp3file)
+
         check_call(encodecmd([ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc', '-acodec', 'copy', tmpfile]), stdout=FNULL, stderr=STDOUT)
         check_call(encodecmd([ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar', '22050', '-ac', '1', '-ab', '48k', mp3file]),
                    stdout=FNULL, stderr=STDOUT)
 
         # MP3ファイルにタグを設定 (mutagen)
+        title = '{date}_{kouzaname}'.format(kouzaname=kouzaname, date=date.strftime('%Y_%m_%d'))
+        artist = 'NHK'
+        if USE_DB_TAG:
+            # 番組表データベースからタイトルと出演者情報を取得
+            try:
+                cur = con.cursor()
+                cur.execute('SELECT * FROM programs WHERE kouza=? and date=?', (kouzaname, date))
+                program = cur.fetchone()
+                title = program['title']
+                artist = program['artist']
+            except Exception:
+                print('cannot find program in database. use default title and artist')
+
         setmp3tag(mp3file,
                   image=imgfile,
-                  title='{date}_{kouzaname}'.format(kouzaname=kouzaname, date=date.strftime('%Y_%m_%d')),
-                  artist='NHK',
+                  title=title,
+                  artist=artist,
                   album=albumname,
                   genre='Speech',
                   track_num=None if reair else existed_track_numbter + number_on_week + 1,
@@ -179,6 +199,9 @@ def streamedump(kouzaname, language, kouza, kouzano):
                   disc_num=1,
                   total_disc_num=1
                   )
+
+    if USE_DB_TAG:
+        con.close()
 
 
 if __name__ == '__main__':
