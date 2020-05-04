@@ -141,12 +141,16 @@ def streamedump(kouzaname, language, kouza, kouzano):
 
     # ジャケット画像ファイルを取得する
     # REVIEW: 2020年1月号のテキストのURLが...012019...になり規則通りではなかった。NHK側のミスの可能性高いが注意が必要
-    imgurl = IMGURL.format(kouzano=kouzano, date=('{:02d}{:04d}'.format(text_month, text_year)))
-    imgfile = os.path.join(TMPDIR, os.path.basename(imgurl))
-    imgdata = urllib.request.urlopen(imgurl)
-    with open(imgfile, 'wb') as f:
-        f.write(imgdata.read())
-    imgdata.close()
+    try:
+        imgurl = IMGURL.format(kouzano=kouzano, date=('{:02d}{:04d}'.format(text_month, text_year)))
+        imgfile = os.path.join(TMPDIR, os.path.basename(imgurl))
+        imgdata = urllib.request.urlopen(imgurl)
+        with open(imgfile, 'wb') as f:
+            f.write(imgdata.read())
+        imgdata.close()
+    except Exception as e:
+        print('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
+        imgfile = None
 
     if USE_DB_TAG:
         con = sqlite3.connect(DB_FILE)
