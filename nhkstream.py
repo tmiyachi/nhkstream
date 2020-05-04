@@ -112,11 +112,12 @@ def streamedump(kouzaname, language, kouza, kouzano):
 
         for div in bs.find('div', class_='ct1').find('dd').find_all('div', recursive=False):
             if kouzaname in div.find('p').text:
-                p = div.find('p')
-                if '再放送' in p.text and date_list[0].strftime('%-m月%-d日') in p.text:
+                p = div.find('div').find('p')
+                if '再放送' in p.text and ('{}月{}日').format(date_list[0].month, date_list[0].day) in p.text:
+                    print('再放送のため一時ディレクトリに保存します。')
                     reair = True
-    except Exception:
-        reair = True
+    except Exception as e:
+        print('再放送の判定ができませんでした。')
 
     # ディレクトリの作成
     TMPDIR = os.path.join(TMPBASEDIR, 'nhkdump')
