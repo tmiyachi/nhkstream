@@ -140,6 +140,13 @@ def streamedump(kouzaname, language, kouza, kouzano):
         existed_track_list = []
     existed_track_numbter = len(existed_track_list)
 
+    # トータルトラック数を決定する
+    if kouza == 'timetrial' and text_month == 5:
+        # 英会話タイムトライアルは5月は他講座より再放送が1週多い
+        total_track_num = len(date_list) * 3
+    else:
+        total_track_num = len(date_list) * 4
+
     # ジャケット画像ファイルを取得する
     # REVIEW: 2020年1月号のテキストのURLが...012019...になり規則通りではなかった。NHK側のミスの可能性高いが注意が必要
     try:
@@ -199,7 +206,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
                   album=albumname,
                   genre='Speech',
                   track_num=None if reair else existed_track_numbter + number_on_week + 1,
-                  total_track_num=None,
+                  total_track_num=total_track_num,
                   year=text_year,
                   disc_num=1,
                   total_disc_num=1
