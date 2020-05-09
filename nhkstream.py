@@ -116,7 +116,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
                 if '再放送' in p.text and ('{}月{}日').format(date_list[0].month, date_list[0].day) in p.text:
                     print('再放送のため一時ディレクトリに保存します。')
                     reair = True
-    except Exception as e:
+    except Exception:
         print('再放送の判定ができませんでした。')
 
     # ディレクトリの作成
@@ -149,7 +149,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
         with open(imgfile, 'wb') as f:
             f.write(imgdata.read())
         imgdata.close()
-    except Exception as e:
+    except (urllib.error.HTTPError, urllib.error.URLError):
         print('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
         imgfile = None
 
