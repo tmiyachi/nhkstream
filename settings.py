@@ -40,7 +40,7 @@ XMLURL = "https://cgi2.nhk.or.jp/gogaku/st/xml/{language}/{kouza}/listdataflv.xm
 # NHK語学講座のストリーミングファイルURLテンプレート
 MP4URL = 'https://nhks-vh.akamaihd.net/i/gogaku-stream/mp4/{mp4file}/master.m3u8'
 # ファイルのサムネイルにするためのNHKテキストの画像ファイルのURLテンプレート
-IMGURL = 'https://nhkbook.jp-east-2.storage.api.nifcloud.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'
+IMGURL = 'https://nhkbook.s3-ap-northeast-1.amazonaws.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'
 
 # 出力ディレクトリ
 OUTBASEDIR = os.environ.get('OUTBASEDIR')
