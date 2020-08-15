@@ -181,9 +181,10 @@ def streamedump(kouzaname, language, kouza, kouzano):
         else:
             print('download ' + mp3file)
 
-        check_call(encodecmd([ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc', '-acodec', 'copy', tmpfile]), stdout=FNULL, stderr=STDOUT)
-        check_call(encodecmd([ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar', '22050', '-ac', '1', '-ab', '48k', mp3file]),
-                   stdout=FNULL, stderr=STDOUT)
+        check_call(encodecmd([ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc',
+                              '-acodec', 'copy', tmpfile]), stdout=FNULL, stderr=STDOUT)
+        check_call(encodecmd([ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar',
+                              '22050', '-ac', '1', '-ab', '48k', mp3file]), stdout=FNULL, stderr=STDOUT)
 
         # MP3ファイルにタグを設定 (mutagen)
         title = '{date}_{kouzaname}'.format(kouzaname=kouzaname, date=date.strftime('%Y_%m_%d'))

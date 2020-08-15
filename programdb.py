@@ -27,7 +27,7 @@ def getArtist(act):
 
 # 翌日から1週間分の番組表から番組データを取得する
 json = []
-for date in rrule(freq=DAILY, dtstart=datetime.today() + relativedelta(days=1   ), count=7):
+for date in rrule(freq=DAILY, dtstart=datetime.today() + relativedelta(days=1), count=7):
     r = requests.get(NHK_PROGRAM_API.format(area=NHK_AREA, service=NHK_SERVICE,
                                             genre=NHK_GENRE, apikey=NHK_APIKEY, date=date.strftime('%Y-%m-%d')))
     json.extend(r.json()['list']['r2'])
