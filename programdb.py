@@ -35,22 +35,32 @@ for date in rrule(freq=DAILY, dtstart=datetime.today() + relativedelta(days=1), 
 df = pd.DataFrame(json)
 df = df.loc[:, ['start_time', 'title', 'act']]
 
-# 放送時間で並べ替えて同一タイトルの重複行を削除（再放送の削除）
-df = df.sort_values(['start_time', 'title'])
-df = df.drop_duplicates('title')
-
 # NHK番組表では英数字も全角なので半角へ置換し、全角スペースも半角スペースに置換
 df['title'] = df.title.apply(lambda s: jaconv.z2h(s, kana=False, ascii=True, digit=True).replace('　', ' '))
-
-# 時刻情報は不要なので日付情報のみに変換
-df['date'] = pd.to_datetime(df.start_time).apply(lambda d: datetime(d.year, d.month, d.day))
 
 # 講座名とアーティスト名をmp3タグに設定する形式に変換する
 df['kouza'] = df.title.apply(getKouza)
 df['artist'] = df.act.apply(getArtist)
 
-# PROGRAM_LISTで設定されていない番組を削除、講座名と日付が同じタイトルは最初に放送されるタイトルのみ残す（前週の再放送を削除）
-df = df[df.kouza.notna()].drop_duplicates(['kouza', 'date']).reset_index()
+# 時刻情報は不要なので日付情報のみに変換
+df['date'] = pd.to_datetime(df.start_time).apply(lambda d: datetime(d.year, d.month, d.day))
+
+# PROGRAM_LISTで設定されていない番組を削除
+df = df[df.kouza.notna()]
+
+# 先週放送された番組タイトルのリストを取得
+conn = sqlite3.connect(DB_FILE)
+sql = 'SELECT title FROM programs WHERE date BETWEEN {} and {}'.format(
+    (datetime.today() + relativedelta(days=-6)).strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'))
+titles_lastweek = pd.read_sql(sql, conn).title.to_list()
+conn.close()
+
+# 先週放送された番組と同じタイトルの番組（再放送）は削除
+df = df.loc[~df.title.isin(titles_lastweek), :]
+
+# 放送時間で並べ替えて同一タイトルの重複行を削除（同じ週の再放送の削除）
+df = df.sort_values(['start_time', 'title'])
+df = df.drop_duplicates('title').drop_duplicates(['date', 'kouza']).reset_index()
 
 # データベースファイルに追加する
 df = df.loc[:, ['date', 'title', 'artist', 'kouza']]

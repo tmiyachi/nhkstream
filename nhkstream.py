@@ -8,7 +8,6 @@ from datetime import datetime
 from subprocess import STDOUT, check_call
 import sqlite3
 
-import requests
 from dateutil.relativedelta import relativedelta, MO, FR
 
 from bs4 import BeautifulSoup
@@ -17,7 +16,7 @@ from mutagen.mp3 import MP3
 
 from settings import KOUZALIST, OUTBASEDIR, TMPOUTDIR, TMPBASEDIR
 from settings import XMLURL, MP4URL, IMGURL
-from settings import USE_DB_TAG, DB_FILE
+from settings import DB_FILE
 from settings import ffmpeg
 
 from util import encodecmd, dict_factory
@@ -104,29 +103,10 @@ def streamedump(kouzaname, language, kouza, kouzano):
     # アルバム名
     albumname = '{kouzaname}{year:d}年{month:02d}月号'.format(kouzaname=kouzaname, year=text_year, month=text_month)
 
-    # 再放送週かどうかの確認
-    reair = False
-    try:
-        r = requests.get('https://www2.nhk.or.jp/gogaku/topics.cgi')
-        bs = BeautifulSoup(r.content.decode('utf-8'), 'lxml')
-
-        for div in bs.find('div', class_='ct1').find('dd').find_all('div', recursive=False):
-            if kouzaname in div.find('p').text:
-                p = div.find('div').find('p')
-                if '再放送' in p.text and ('{}月{}日').format(date_list[0].month, date_list[0].day) in p.text:
-                    print('再放送のため一時ディレクトリに保存します。')
-                    reair = True
-    except Exception:
-        print('再放送の判定ができませんでした。')
-
     # ディレクトリの作成
     TMPDIR = os.path.join(TMPBASEDIR, 'nhkdump')
-    if reair:
-        # 再放送週なら一時保存ディレクトリに念のため保存して後で削除
-        OUTDIR = TMPOUTDIR
-    else:
-        # 通常放送週ならアルバム名のディレクトリに保存する
-        OUTDIR = os.path.join(OUTBASEDIR, kouzaname, '{year:d}年{month:02d}月号'.format(year=text_year, month=text_month))
+    # アルバム名のディレクトリに保存する
+    OUTDIR = os.path.join(OUTBASEDIR, kouzaname, '{year:d}年{month:02d}月号'.format(year=text_year, month=text_month))
     if os.path.isdir(TMPDIR):
         shutil.rmtree(TMPDIR, ignore_errors=True)
     os.makedirs(TMPDIR)
@@ -134,10 +114,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
         os.makedirs(OUTDIR)
 
     # 同じ保存ディレクトリに存在するmp3ファイルの数からタグに付加するトラックナンバーの開始数を決定する
-    if not reair:
-        existed_track_list = list(glob.glob(os.path.join(OUTDIR, '*.mp3')))
-    else:
-        existed_track_list = []
+    existed_track_list = list(glob.glob(os.path.join(OUTDIR, '*.mp3')))
     existed_track_numbter = len(existed_track_list)
 
     # トータルトラック数を決定する
@@ -160,16 +137,36 @@ def streamedump(kouzaname, language, kouza, kouzano):
         print('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
         imgfile = None
 
-    if USE_DB_TAG:
-        con = sqlite3.connect(DB_FILE)
-        con.row_factory = dict_factory
+    # 番組表データベースに接続
+    con = sqlite3.connect(DB_FILE)
+    con.row_factory = dict_factory
 
     # mp4ファイルをダウンロードしてmp3にファイルに変換する
     FNULL = open(os.devnull, 'w')
     for number_on_week, (mp4file, date) in enumerate(zip(file_list, date_list)):
+        # 番組表データベースからタイトルと出演者情報を取得
+        try:
+            cur = con.cursor()
+            cur.execute('SELECT * FROM programs WHERE kouza=? and date=?', (kouzaname, date))
+            program = cur.fetchone()
+            title = program['title']
+            artist = program['artist']
+            reair = False
+        except Exception:
+            # データベースから取得できないときは暫定タグを設定
+            title = '{date}_{kouzaname}'.format(kouzaname=kouzaname, date=date.strftime('%Y_%m_%d'))
+            artist = 'NHK'
+            reair = True
+            print('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
+
         mp4url = MP4URL.format(mp4file=mp4file)
         tmpfile = os.path.join(TMPDIR, '{kouza}_{date}.mp4'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
-        mp3file = os.path.join(OUTDIR, '{kouza}_{date}.mp3'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
+        if reair:
+            mp3file = os.path.join(
+                TMPOUTDIR, '{kouza}_{date}.mp3'.format(
+                    kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
+        else:
+            mp3file = os.path.join(OUTDIR, '{kouza}_{date}.mp3'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
 
         if mp3file in existed_track_list:
             existed_track_numbter = existed_track_numbter - 1
@@ -186,20 +183,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
         check_call(encodecmd([ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar',
                               '22050', '-ac', '1', '-ab', '48k', mp3file]), stdout=FNULL, stderr=STDOUT)
 
-        # MP3ファイルにタグを設定 (mutagen)
-        title = '{date}_{kouzaname}'.format(kouzaname=kouzaname, date=date.strftime('%Y_%m_%d'))
-        artist = 'NHK'
-        if USE_DB_TAG:
-            # 番組表データベースからタイトルと出演者情報を取得
-            try:
-                cur = con.cursor()
-                cur.execute('SELECT * FROM programs WHERE kouza=? and date=?', (kouzaname, date))
-                program = cur.fetchone()
-                title = program['title']
-                artist = program['artist']
-            except Exception:
-                print('cannot find program in database. use default title and artist')
-
+        # mp3タグを設定
         setmp3tag(mp3file,
                   image=imgfile,
                   title=title,
@@ -213,8 +197,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
                   total_disc_num=1
                   )
 
-    if USE_DB_TAG:
-        con.close()
+    con.close()
 
 
 if __name__ == '__main__':
