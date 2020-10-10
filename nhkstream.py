@@ -7,6 +7,7 @@ import urllib.request
 from datetime import datetime
 from subprocess import STDOUT, check_call
 import sqlite3
+import logging
 
 from dateutil.relativedelta import relativedelta, MO, FR
 
@@ -14,10 +15,14 @@ from bs4 import BeautifulSoup
 from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK, TYER
 from mutagen.mp3 import MP3
 
+import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
+
 from settings import KOUZALIST, OUTBASEDIR, TMPOUTDIR, TMPBASEDIR
 from settings import XMLURL, MP4URL, IMGURL
 from settings import DB_FILE
 from settings import ffmpeg
+from settings import SENTRY_DSN_KEY
 
 from util import encodecmd, dict_factory
 
@@ -135,6 +140,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
         imgdata.close()
     except (urllib.error.HTTPError, urllib.error.URLError):
         print('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
+        logging.info('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
         imgfile = None
 
     # 番組表データベースに接続
@@ -158,6 +164,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
             artist = 'NHK'
             reair = True
             print('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
+            logging.info('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
 
         mp4url = MP4URL.format(mp4file=mp4file)
         tmpfile = os.path.join(TMPDIR, '{kouza}_{date}.mp4'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
@@ -174,6 +181,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
         if os.path.isfile(mp3file):
             if os.path.getsize(mp3file) > 3000000:
                 print(mp3file + ' still exist. skip.')
+                logging.info('skip {} {}'.format(albumname, os.path.basename(mp3file)))
                 continue
         else:
             print('download ' + mp3file)
@@ -182,6 +190,8 @@ def streamedump(kouzaname, language, kouza, kouzano):
                               '-acodec', 'copy', tmpfile]), stdout=FNULL, stderr=STDOUT)
         check_call(encodecmd([ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar',
                               '22050', '-ac', '1', '-ab', '48k', mp3file]), stdout=FNULL, stderr=STDOUT)
+
+        logging.info('完了: {} {}'.format(albumname, os.path.basename(mp3file)))
 
         # mp3タグを設定
         setmp3tag(mp3file,
@@ -201,5 +211,14 @@ def streamedump(kouzaname, language, kouza, kouzano):
 
 
 if __name__ == '__main__':
+    if SENTRY_DSN_KEY is not None:
+        sentry_logging = LoggingIntegration(
+            level=logging.INFO,        # Capture info and above as breadcrumbs
+            event_level=logging.ERROR  # Send errors as events
+        )
+        sentry_sdk.init(
+            dsn=SENTRY_DSN_KEY,
+            integrations=[sentry_logging]
+        )
     for kouzaname, language, kouza, kouzano in KOUZALIST:
         streamedump(kouzaname, language, kouza, kouzano)
