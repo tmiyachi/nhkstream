@@ -90,4 +90,4 @@ NHK_APIKEY = os.environ.get('NHK_APIKEY')
 NHK_PROGRAM_API = 'https://api.nhk.or.jp/v2/pg/genre/{area}/{service}/{genre}/{date}.json?key={apikey}'
 
 # SetnryのDSNキー
-SENTRY_DSN_KEY = None  # os.environ.get('SENTRY_DSN_KEY', None)
+SENTRY_DSN_KEY = os.environ.get('SENTRY_DSN_KEY', None)
