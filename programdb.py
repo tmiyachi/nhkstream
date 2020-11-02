@@ -50,11 +50,10 @@ df = df[df.kouza.notna()]
 
 # 先週放送された番組タイトルのリストを取得
 conn = sqlite3.connect(DB_FILE)
-sql = 'SELECT title FROM programs WHERE date BETWEEN {} and {}'.format(
+sql = 'SELECT title FROM programs WHERE date BETWEEN "{}" and "{}"'.format(
     (datetime.today() + relativedelta(days=-6)).strftime('%Y-%m-%d'), datetime.today().strftime('%Y-%m-%d'))
 titles_lastweek = pd.read_sql(sql, conn).title.to_list()
 conn.close()
-
 # 先週放送された番組と同じタイトルの番組（再放送）は削除
 df = df.loc[~df.title.isin(titles_lastweek), :]
 
