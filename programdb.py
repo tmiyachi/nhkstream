@@ -63,6 +63,7 @@ df = df.drop_duplicates('title').drop_duplicates(['date', 'kouza']).reset_index(
 
 # データベースファイルに追加する
 df = df.loc[:, ['date', 'title', 'artist', 'kouza']]
+print('inserted records = {}'.format(len(df)))
 conn = sqlite3.connect(DB_FILE)
 df.to_sql('programs', conn, index=False, if_exists='append')
 conn.close()
