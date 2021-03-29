@@ -22,8 +22,11 @@ KOUZALIST = [
     ['ラジオ英会話', 'english', 'kaiwa', 9137],
     ['英会話タイムトライアル', 'english', 'timetrial', 9105],
     ['高校生からはじめる「現代英語」', 'english', 'gendai', 9535],
+    #    ['入門ビジネス英語', 'english', 'business1', 7216],
+    ['ラジオビジネス英語', 'english', 'business2', 8825],
     ['まいにちスペイン語（入門編）', 'spanish', 'kouza', 9145],
-    ['まいにちスペイン語（中級編）', 'spanish', 'kouza2', 9145],
+    #    ['まいにちスペイン語（中級編）', 'spanish', 'kouza2', 9145],
+    ['まいにちスペイン語（応用編）', 'spanish', 'kouza2', 9145],
     ['まいにちロシア語（入門編）', 'russian', 'kouza', 9147],
     ['まいにちロシア語（応用編）', 'russian', 'kouza2', 9147],
     ['まいにちフランス語（入門編）', 'french', 'kouza', 9113],
@@ -34,6 +37,8 @@ KOUZALIST = [
     ['まいにちイタリア語（応用編）', 'italian', 'kouza2', 9159],
     ['まいにち中国語', 'chinese', 'kouza', 9101],
     ['ステップアップ中国語', 'chinese', 'stepup', 9099],
+    ['まいにちハングル講座', 'hangeul', 'kouza', 9277],
+    ['ステップアップハングル講座', 'hangeul', 'stepup', 9555],
 ]
 
 # NHK語学講座XMLデータのURLテンプレート
@@ -41,7 +46,7 @@ XMLURL = "https://cgi2.nhk.or.jp/gogaku/st/xml/{language}/{kouza}/listdataflv.xm
 # NHK語学講座のストリーミングファイルURLテンプレート
 MP4URL = 'https://nhks-vh.akamaihd.net/i/gogaku-stream/mp4/{mp4file}/master.m3u8'
 # ファイルのサムネイルにするためのNHKテキストの画像ファイルのURLテンプレート
-IMGURL = 'https://nhkbook.s3-ap-northeast-1.amazonaws.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'
+IMGURL = 'https://nhkbook.s3-ap-northeast-1.amazonaws.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'  # noqa: E501
 
 # 出力ディレクトリ
 OUTBASEDIR = os.environ.get('OUTBASEDIR')
@@ -70,8 +75,12 @@ PROGRAMLIST = [
     ['ラジオ英会話', 'ラジオ英会話'],
     ['英会話タイムトライアル', '英会話タイムトライアル'],
     ['高校生からはじめる「現代英語」', '高校生からはじめる「現代英語」'],
+    #    ['入門ビジネス英語', '入門ビジネス英語'],
+    #    ['実践ビジネス英語', '実践ビジネス英語'],
+    ['ラジオビジネス英語', 'ラジオビジネス英語'],
     ['まいにちスペイン語 入門編', 'まいにちスペイン語（入門編）'],
-    ['まいにちスペイン語 中級編', 'まいにちスペイン語（中級編）'],
+    #    ['まいにちスペイン語 中級編', 'まいにちスペイン語（中級編）'],
+    ['まいにちスペイン語 応用編', 'まいにちスペイン語（応用編）'],
     ['まいにちロシア語 入門編', 'まいにちロシア語（入門編）'],
     ['まいにちロシア語 応用編', 'まいにちロシア語（応用編）'],
     ['まいにちフランス語 入門編', 'まいにちフランス語（入門編）'],
@@ -82,6 +91,8 @@ PROGRAMLIST = [
     ['まいにちイタリア語 応用編', 'まいにちイタリア語（応用編）'],
     ['まいにち中国語', 'まいにち中国語'],
     ['ステップアップ中国語', 'ステップアップ中国語'],
+    ['まいにちハングル講座', 'まいにちハングル講座'],
+    ['ステップアップ ハングル講座', 'ステップアップハングル講座'],
 ]
 
 # NHK番組表API(https://api-portal.nhk.or.jp/ja)で使用するパラメータ
