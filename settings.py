@@ -36,7 +36,7 @@ KOUZALIST = [
     ['まいにちイタリア語（入門編）', 'italian', 'kouza', 9159],
     ['まいにちイタリア語（応用編）', 'italian', 'kouza2', 9159],
     ['まいにち中国語', 'chinese', 'kouza', 9101],
-    ['ステップアップ中国語', 'chinese', 'stepup', 9099],
+    #    ['ステップアップ中国語', 'chinese', 'stepup', 9099],
     ['まいにちハングル講座', 'hangeul', 'kouza', 9277],
     ['ステップアップハングル講座', 'hangeul', 'stepup', 9555],
 ]
