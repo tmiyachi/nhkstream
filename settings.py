@@ -23,7 +23,7 @@ KOUZALIST = [
     ['英会話タイムトライアル', 'english', 'timetrial', 9105],
     ['高校生からはじめる「現代英語」', 'english', 'gendai', 9535],
     #    ['入門ビジネス英語', 'english', 'business1', 7216],
-    ['ラジオビジネス英語', 'english', 'business2', 8825],
+    ['ラジオビジネス英語', 'english', 'business1', 8825],
     ['まいにちスペイン語（入門編）', 'spanish', 'kouza', 9145],
     #    ['まいにちスペイン語（中級編）', 'spanish', 'kouza2', 9145],
     ['まいにちスペイン語（応用編）', 'spanish', 'kouza2', 9145],
