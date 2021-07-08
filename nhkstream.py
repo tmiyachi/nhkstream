@@ -5,7 +5,7 @@ import os.path
 import shutil
 import urllib.request
 from datetime import datetime
-from subprocess import STDOUT, check_call
+from subprocess import CalledProcessError, STDOUT, check_call
 import sqlite3
 import logging
 from dateutil.relativedelta import TU, relativedelta, FR
@@ -187,12 +187,19 @@ def streamedump(kouzaname, language, kouza, kouzano):
                 continue
         else:
             print('download ' + mp3file)
-
-        check_call(encodecmd([ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc',
-                              '-acodec', 'copy', tmpfile]), stdout=FNULL, stderr=STDOUT)
-        check_call(encodecmd([ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar',
-                              '22050', '-ac', '1', '-ab', '48k', mp3file]), stdout=FNULL, stderr=STDOUT)
-
+        try:
+            cmd_args = [ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc', '-acodec', 'copy', tmpfile]
+            check_call(encodecmd(cmd_args), stdout=FNULL, stderr=STDOUT)
+        except CalledProcessError as e:
+            print('コマンドの実行に失敗．\n' + ' '.join(cmd_args))
+            raise e
+        try:
+            cmd_args = [ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar', '22050',
+                        '-ac', '1', '-ab', '48k', mp3file]
+            check_call(encodecmd(cmd_args), stdout=FNULL, stderr=STDOUT)
+        except CalledProcessError as e:
+            print('コマンドの実行に失敗．\n' + ' '.join(cmd_args))
+            raise e
         logging.info('完了: {} {}'.format(albumname, os.path.basename(mp3file)))
 
         # mp3タグを設定
