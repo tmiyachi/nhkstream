@@ -8,8 +8,7 @@ from datetime import datetime
 from subprocess import STDOUT, check_call
 import sqlite3
 import logging
-
-from dateutil.relativedelta import relativedelta, MO, FR
+from dateutil.relativedelta import TU, relativedelta, FR
 
 from bs4 import BeautifulSoup
 from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK, TYER
@@ -88,22 +87,22 @@ def streamedump(kouzaname, language, kouza, kouzano):
         date_list.append(file_date)
 
     # ストリーミングの日付から何月号のテキストかを調べる
-    this_week_monday = date_list[0] + relativedelta(weekday=MO(-1))
+    this_week_tuesday = date_list[0] + relativedelta(weekday=TU(-1))
     this_week_friday = date_list[0] + relativedelta(weekday=FR)
-    if this_week_monday.month == this_week_friday.month:
+    if this_week_tuesday.month == this_week_friday.month:
         # 週のはじめと終わりが同じ場合は初日と同じ月が該当月
-        text_year = this_week_monday.year
-        text_month = this_week_monday.month
+        text_year = this_week_tuesday.year
+        text_month = this_week_tuesday.month
     else:
         # 週のはじめと終わりが違う場合は前週か次週の月のテキスト
-        if (this_week_monday.day - 1) // 7 + 1 == 5:
+        if (this_week_tuesday.day - 1) // 7 + 1 == 5:
             # 月曜日が第5週なら次号
             text_year = this_week_friday.year
             text_month = this_week_friday.month
         else:
             # 第5週でなければ前号
-            text_year = this_week_monday.year
-            text_month = this_week_monday.month
+            text_year = this_week_tuesday.year
+            text_month = this_week_tuesday.month
 
     # アルバム名
     albumname = '{kouzaname}{year:d}年{month:02d}月号'.format(kouzaname=kouzaname, year=text_year, month=text_month)
