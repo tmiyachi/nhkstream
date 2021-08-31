@@ -12,7 +12,6 @@ pandas = "*"
 requests = "*"
 jaconv = "*"
 python-dateutil = "*"
-bs4 = "*"
 mutagen = "*"
 sentry-sdk = "*"
 

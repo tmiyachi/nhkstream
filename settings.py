@@ -8,43 +8,39 @@ dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
 # 取得したい講座のパラメータのリストを
-#  [kouzaname, language, kouza, kouzano]
+#  [kouzaname, site_id, kouzano]
 # の順で設定する
 # パラメータの意味は以下の通り
 # kouzaname: ファイル名に使用する講座名
-# language, kouza:
-#  NHK語学講座XMLデータを取得するためのパラメータ
-#  https://cgi2.nhk.or.jp/gogaku/st/xml/{language}/{kouza}/listdataflv.xml
+# site_id:
+#  NHKらじるらじるJSONデータを取得するためのパラメータ
+#  https://www.nhk.or.jp/radioondemand/json/{site_id}/bangumi_{site_id}_01.json
 # kouzano:
 #  テキストの画像を取得するためのパラメータ
 #  https://www.nhk-book.co.jp/detail/00000{kouzano}052020.html
 KOUZALIST = [
-    ['ラジオ英会話', 'english', 'kaiwa', 9137],
-    ['英会話タイムトライアル', 'english', 'timetrial', 9105],
-    ['高校生からはじめる「現代英語」', 'english', 'gendai', 9535],
-    #    ['入門ビジネス英語', 'english', 'business1', 7216],
-    ['ラジオビジネス英語', 'english', 'business1', 8825],
-    ['まいにちスペイン語（入門編）', 'spanish', 'kouza', 9145],
-    #    ['まいにちスペイン語（中級編）', 'spanish', 'kouza2', 9145],
-    ['まいにちスペイン語（応用編）', 'spanish', 'kouza2', 9145],
-    ['まいにちロシア語（入門編）', 'russian', 'kouza', 9147],
-    ['まいにちロシア語（応用編）', 'russian', 'kouza2', 9147],
-    ['まいにちフランス語（入門編）', 'french', 'kouza', 9113],
-    ['まいにちフランス語（応用編）', 'french', 'kouza2', 9113],
-    ['まいにちドイツ語（入門編）', 'german', 'kouza', 9109],
-    ['まいにちドイツ語（応用編）', 'german', 'kouza2', 9109],
-    ['まいにちイタリア語（入門編）', 'italian', 'kouza', 9159],
-    ['まいにちイタリア語（応用編）', 'italian', 'kouza2', 9159],
-    ['まいにち中国語', 'chinese', 'kouza', 9101],
-    #    ['ステップアップ中国語', 'chinese', 'stepup', 9099],
-    ['まいにちハングル講座', 'hangeul', 'kouza', 9277],
-    ['ステップアップハングル講座', 'hangeul', 'stepup', 9555],
+    ['ラジオ英会話', '0916', 9137],
+    ['英会話タイムトライアル', '2331', 9105],
+    ['高校生からはじめる「現代英語」', '4407', 9535],
+    ['ラジオビジネス英語', '6809', 8825],
+    ['まいにちスペイン語（入門編）', '0948', 9145],
+    ['まいにちスペイン語（応用編）', '4413', 9145],
+    ['まいにちロシア語（入門編）', '0956', 9147],
+    ['まいにちロシア語（応用編）', '4414', 9147],
+    ['まいにちフランス語（入門編）', '0953', 9113],
+    ['まいにちフランス語（応用編）', '4412', 9113],
+    ['まいにちドイツ語（入門編）', '0943', 9109],
+    ['まいにちドイツ語（応用編）', '4410', 9109],
+    ['まいにちイタリア語（入門編）', '0946', 9159],
+    ['まいにちイタリア語（応用編）', '4411', 9159],
+    ['まいにち中国語', '0915', 9101],
+    #    ['ステップアップ中国語', '6581', 9099],
+    ['まいにちハングル講座', '0951', 9277],
+    ['ステップアップハングル講座', '6810', 9555],
 ]
 
-# NHK語学講座XMLデータのURLテンプレート
-XMLURL = "https://cgi2.nhk.or.jp/gogaku/st/xml/{language}/{kouza}/listdataflv.xml"
-# NHK語学講座のストリーミングファイルURLテンプレート
-MP4URL = 'https://nhks-vh.akamaihd.net/i/gogaku-stream/mp4/{mp4file}/master.m3u8'
+# らじるらじる聞き逃しjsonのURLテンプレート
+JSONURL = "https://www.nhk.or.jp/radioondemand/json/{site_id}/bangumi_{site_id}_01.json"
 # ファイルのサムネイルにするためのNHKテキストの画像ファイルのURLテンプレート
 IMGURL = 'https://nhkbook.s3-ap-northeast-1.amazonaws.com/image/goods/{kouzano:09d}{date}/{kouzano:09d}{date}_01_420.jpg'  # noqa: E501
 

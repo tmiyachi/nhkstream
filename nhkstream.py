@@ -1,29 +1,25 @@
 # coding:utf-8
 import glob
+import logging
 import os
 import os.path
 import shutil
-import urllib.request
-from datetime import datetime
-from subprocess import CalledProcessError, STDOUT, check_call
 import sqlite3
-import logging
-from dateutil.relativedelta import TU, relativedelta, FR
+import urllib.request
+from subprocess import STDOUT, CalledProcessError, check_call
 
-from bs4 import BeautifulSoup
-from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK, TYER
-from mutagen.mp3 import MP3
-
+import requests
 import sentry_sdk
+from dateutil import parser
+from dateutil.relativedelta import FR, TU, relativedelta
+from mutagen.id3 import (APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK,
+                         TYER)
+from mutagen.mp3 import MP3
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-from settings import KOUZALIST, OUTBASEDIR, TMPOUTDIR, TMPBASEDIR
-from settings import XMLURL, MP4URL, IMGURL
-from settings import DB_FILE
-from settings import ffmpeg
-from settings import SENTRY_DSN_KEY
-
-from util import encodecmd, dict_factory
+from settings import (DB_FILE, IMGURL, JSONURL, KOUZALIST, OUTBASEDIR,
+                      SENTRY_DSN_KEY, TMPBASEDIR, TMPOUTDIR, ffmpeg)
+from util import dict_factory
 
 
 # mp3ファイルにタグを保存する
@@ -67,24 +63,34 @@ def setmp3tag(mp3file, image=None, title=None, album=None, artist=None, track_nu
     audio.save(v2_version=3, v1=2)
 
 
-# メイン関数
-def streamedump(kouzaname, language, kouza, kouzano):
-    # XMLからストリーミングファイルの情報を取得する
-    xmlfile = urllib.request.urlopen(XMLURL.format(language=language, kouza=kouza))
-    soup = BeautifulSoup(xmlfile.read().decode('utf-8').replace('\n', ''), features='lxml')
+class ondemandParser:
+    def __init__(self, site_id):
+        url = JSONURL.format(site_id=site_id)
+        res = requests.get(url)
+        self.info_list = [
+            {
+                'mp4url': detail['file_list'][0]['file_name'],
+                'date': parser.parse(detail['file_list'][0]['aa_vinfo4'].split('_')[0]),
+            }
+            for detail in res.json()['main']['detail_list']
+        ]
 
+    def get_info_list(self):
+        return self.info_list
+
+    def get_date_list(self):
+        return [d['date'] for d in self.info_list]
+
+    def get_mp4url_list(self):
+        return [d['mp4url'] for d in self.info_list]
+
+
+# メイン関数
+def streamedump(kouzaname, site_id, kouzano):
     # ファイル名と放送日リストの取得
-    file_list = []
-    date_list = []
-    today = datetime.today()
-    for item in soup.findAll('music'):
-        file_list.append(item.get('file'))
-        file_date = datetime.strptime(item.get('hdate'), '%m月%d日放送分')
-        if file_date.month == 12 and today.month == 1:
-            file_date = file_date + relativedelta(year=today.year - 1)
-        else:
-            file_date = file_date + relativedelta(year=today.year)
-        date_list.append(file_date)
+    oparser = ondemandParser(site_id)
+    mp4url_list = oparser.get_mp4url_list()
+    date_list = oparser.get_date_list()
 
     # ストリーミングの日付から何月号のテキストかを調べる
     this_week_tuesday = date_list[0] + relativedelta(weekday=TU)
@@ -122,7 +128,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
     existed_track_numbter = len(existed_track_list)
 
     # トータルトラック数を決定する
-    if kouza == 'timetrial' and text_month == 5:
+    if kouzaname == '英会話タイムトライアル' and text_month == 5:
         # 英会話タイムトライアルは5月は他講座より再放送が1週多い
         total_track_num = len(date_list) * 3
     else:
@@ -151,7 +157,7 @@ def streamedump(kouzaname, language, kouza, kouzano):
 
     # mp4ファイルをダウンロードしてmp3にファイルに変換する
     FNULL = open(os.devnull, 'w')
-    for number_on_week, (mp4file, date) in enumerate(zip(file_list, date_list)):
+    for number_on_week, (mp4url, date) in enumerate(zip(mp4url_list, date_list)):
         # 番組表データベースからタイトルと出演者情報を取得
         try:
             cur = con.cursor()
@@ -168,7 +174,6 @@ def streamedump(kouzaname, language, kouza, kouzano):
             print('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
             logging.info('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
 
-        mp4url = MP4URL.format(mp4file=mp4file)
         tmpfile = os.path.join(TMPDIR, '{kouza}_{date}.mp4'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
         if reair:
             mp3file = os.path.join(
@@ -189,14 +194,14 @@ def streamedump(kouzaname, language, kouza, kouzano):
             print('download ' + mp3file)
         try:
             cmd_args = [ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc', '-acodec', 'copy', tmpfile]
-            check_call(encodecmd(cmd_args), stdout=FNULL, stderr=STDOUT)
+            check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
         except CalledProcessError as e:
             print('コマンドの実行に失敗．\n' + ' '.join(cmd_args))
             raise e
         try:
             cmd_args = [ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar', '22050',
                         '-ac', '1', '-ab', '48k', mp3file]
-            check_call(encodecmd(cmd_args), stdout=FNULL, stderr=STDOUT)
+            check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
         except CalledProcessError as e:
             print('コマンドの実行に失敗．\n' + ' '.join(cmd_args))
             raise e
@@ -229,5 +234,5 @@ if __name__ == '__main__':
             dsn=SENTRY_DSN_KEY,
             integrations=[sentry_logging]
         )
-    for kouzaname, language, kouza, kouzano in KOUZALIST:
-        streamedump(kouzaname, language, kouza, kouzano)
+    for kouzaname, site_id, kouzano in KOUZALIST:
+        streamedump(kouzaname, site_id, kouzano)
