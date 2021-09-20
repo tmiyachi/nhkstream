@@ -6,6 +6,9 @@ verify_ssl = true
 [dev-packages]
 flake8 = "*"
 autopep8 = "*"
+black = "==21.9b0"
+isort = "*"
+mypy = "*"
 
 [packages]
 pandas = "*"
@@ -17,3 +20,9 @@ sentry-sdk = "*"
 
 [requires]
 python_version = "3.8"
+
+[scripts]
+flake8 = "flake8 ."
+black = "black ."
+mypy = "mypy ."
+isort = "isort . --atomic"
