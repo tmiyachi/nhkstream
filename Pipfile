@@ -9,6 +9,8 @@ autopep8 = "*"
 black = "==21.9b0"
 isort = "*"
 mypy = "*"
+types-requests = "*"
+types-python-dateutil = "*"
 
 [packages]
 pandas = "*"

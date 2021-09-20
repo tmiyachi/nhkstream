@@ -1,30 +1,54 @@
 # coding:utf-8
-import glob
 import logging
 import os
 import os.path
 import shutil
 import sqlite3
+import time
 import urllib.request
+from datetime import datetime
+from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_call
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 import sentry_sdk
 from dateutil import parser
 from dateutil.relativedelta import FR, TU, relativedelta
-from mutagen.id3 import (APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK,
-                         TYER)
+from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK, TYER
 from mutagen.mp3 import MP3
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-from settings import (DB_FILE, IMGURL, JSONURL, KOUZALIST, OUTBASEDIR,
-                      SENTRY_DSN_KEY, TMPBASEDIR, TMPOUTDIR, ffmpeg)
+from settings import (
+    DB_FILE,
+    IMGURL,
+    JSONURL,
+    KOUZALIST,
+    OUTBASEDIR,
+    SENTRY_DSN_KEY,
+    TMPBASEDIR,
+    TMPOUTDIR,
+    ffmpeg,
+)
 from util import dict_factory
+
+logger = logging.getLogger(__name__)
 
 
 # mp3ファイルにタグを保存する
-def setmp3tag(mp3file, image=None, title=None, album=None, artist=None, track_num=None,
-              year=None, genre=None, total_track_num=None, disc_num=None, total_disc_num=None):
+def setmp3tag(
+    mp3file,
+    image: Union[str, Path, None] = None,
+    title: Optional[str] = None,
+    album: Optional[str] = None,
+    artist: Optional[str] = None,
+    track_num: Optional[int] = None,
+    year: Optional[int] = None,
+    genre: Optional[str] = None,
+    total_track_num: Optional[int] = None,
+    disc_num: Optional[int] = None,
+    total_disc_num: Optional[int] = None,
+) -> None:
     audio = MP3(mp3file, ID3=ID3)
     try:
         audio.add_tag()
@@ -32,13 +56,16 @@ def setmp3tag(mp3file, image=None, title=None, album=None, artist=None, track_nu
         pass
 
     if image is not None:
-        with open(image, 'rb') as f:
-            audio.tags.add(APIC(
-                encoding=3,
-                mime='image/jpeg',
-                type=3,
-                desc='Cover Picture',
-                data=f.read()))
+        with open(image, "rb") as f:
+            audio.tags.add(
+                APIC(
+                    encoding=3,
+                    mime="image/jpeg",
+                    type=3,
+                    desc="Cover Picture",
+                    data=f.read(),
+                )
+            )
     if title is not None:
         audio.tags.add(TIT2(encoding=3, text=title))
     if album is not None:
@@ -50,12 +77,16 @@ def setmp3tag(mp3file, image=None, title=None, album=None, artist=None, track_nu
         if total_track_num is None:
             audio.tags.add(TRCK(encoding=3, text=str(track_num)))
         else:
-            audio.tags.add(TRCK(encoding=3, text='{}/{}'.format(track_num, total_track_num)))
+            audio.tags.add(
+                TRCK(encoding=3, text="{}/{}".format(track_num, total_track_num))
+            )
     if disc_num is not None:
         if total_disc_num is None:
             audio.tags.add(TPOS(encoding=3, text=str(disc_num)))
         else:
-            audio.tags.add(TPOS(encoding=3, text='{}/{}'.format(disc_num, total_disc_num)))
+            audio.tags.add(
+                TPOS(encoding=3, text="{}/{}".format(disc_num, total_disc_num))
+            )
     if genre is not None:
         audio.tags.add(TCON(encoding=3, text=genre))
     if year is not None:
@@ -64,29 +95,35 @@ def setmp3tag(mp3file, image=None, title=None, album=None, artist=None, track_nu
 
 
 class ondemandParser:
-    def __init__(self, site_id):
+    def __init__(self, site_id: str):
         url = JSONURL.format(site_id=site_id)
         res = requests.get(url)
         self.info_list = [
             {
-                'mp4url': detail['file_list'][0]['file_name'],
-                'date': parser.parse(detail['file_list'][0]['aa_vinfo4'].split('_')[0]),
+                "mp4url": detail["file_list"][0]["file_name"],
+                "date": parser.parse(
+                    detail["file_list"][0]["aa_vinfo4"].split("_")[0]
+                ).replace(hour=0, minute=0, second=0, microsecond=0),
             }
-            for detail in res.json()['main']['detail_list']
+            for detail in res.json()["main"]["detail_list"]
         ]
 
-    def get_info_list(self):
+    def get_info_list(self) -> List[Dict[str, Any]]:
         return self.info_list
 
-    def get_date_list(self):
-        return [d['date'] for d in self.info_list]
+    def get_date_list(self) -> List[datetime]:
+        return [d["date"] for d in self.info_list]
 
-    def get_mp4url_list(self):
-        return [d['mp4url'] for d in self.info_list]
+    def get_mp4url_list(self) -> List[str]:
+        return [d["mp4url"] for d in self.info_list]
+
+
+class CommandExecError(Exception):
+    ...
 
 
 # メイン関数
-def streamedump(kouzaname, site_id, kouzano):
+def streamedump(kouzaname: str, site_id: str, kouzano: int) -> None:
     # ファイル名と放送日リストの取得
     oparser = ondemandParser(site_id)
     mp4url_list = oparser.get_mp4url_list()
@@ -111,44 +148,49 @@ def streamedump(kouzaname, site_id, kouzano):
             text_month = this_week_tuesday.month
 
     # アルバム名
-    albumname = '{kouzaname}{year:d}年{month:02d}月号'.format(kouzaname=kouzaname, year=text_year, month=text_month)
+    albumname = f"{kouzaname}{text_year:d}年{text_month:02d}月号"
 
     # ディレクトリの作成
-    TMPDIR = os.path.join(TMPBASEDIR, 'nhkdump')
+    TMPDIR = TMPBASEDIR / "nhkdump"
     # アルバム名のディレクトリに保存する
-    OUTDIR = os.path.join(OUTBASEDIR, kouzaname, '{year:d}年{month:02d}月号'.format(year=text_year, month=text_month))
-    if os.path.isdir(TMPDIR):
+    OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
+
+    if TMPDIR.is_dir():
         shutil.rmtree(TMPDIR, ignore_errors=True)
     os.makedirs(TMPDIR)
-    if not os.path.isdir(OUTDIR):
+    if not OUTDIR.is_dir():
         os.makedirs(OUTDIR)
 
     # 同じ保存ディレクトリに存在するmp3ファイルの数からタグに付加するトラックナンバーの開始数を決定する
-    existed_track_list = list(glob.glob(os.path.join(OUTDIR, '*.mp3')))
+    existed_track_list = list(OUTDIR.glob("*.mp3"))
     existed_track_numbter = len(existed_track_list)
 
     # トータルトラック数を決定する
-    if kouzaname == '英会話タイムトライアル' and text_month == 5:
+    if kouzaname == "英会話タイムトライアル" and text_month == 5:
         # 英会話タイムトライアルは5月は他講座より再放送が1週多い
         total_track_num = len(date_list) * 3
     else:
         total_track_num = len(date_list) * 4
 
     # ジャケット画像ファイルを取得する
+    imgfile: Optional[Path] = None
     try:
-        if (text_month == 1):
+        if text_month == 1:
             # 1月号のテキストのサムネイルは前年の1月になる
-            imgurl = IMGURL.format(kouzano=kouzano, date=('{:02d}{:04d}'.format(text_month, text_year - 1)))
+            imgurl = IMGURL.format(
+                kouzano=kouzano, date=("{:02d}{:04d}".format(text_month, text_year - 1))
+            )
         else:
-            imgurl = IMGURL.format(kouzano=kouzano, date=('{:02d}{:04d}'.format(text_month, text_year)))
-        imgfile = os.path.join(TMPDIR, os.path.basename(imgurl))
+            imgurl = IMGURL.format(
+                kouzano=kouzano, date=("{:02d}{:04d}".format(text_month, text_year))
+            )
+        imgfile = TMPDIR / os.path.basename(imgurl)
         imgdata = urllib.request.urlopen(imgurl)
-        with open(imgfile, 'wb') as f:
+        with open(imgfile, "wb") as f:
             f.write(imgdata.read())
         imgdata.close()
     except (urllib.error.HTTPError, urllib.error.URLError):
-        print('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
-        logging.info('ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。')
+        logger.warning("ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。")
         imgfile = None
 
     # 番組表データベースに接続
@@ -156,83 +198,123 @@ def streamedump(kouzaname, site_id, kouzano):
     con.row_factory = dict_factory
 
     # mp4ファイルをダウンロードしてmp3にファイルに変換する
-    FNULL = open(os.devnull, 'w')
+    FNULL = open(os.devnull, "w")
     for number_on_week, (mp4url, date) in enumerate(zip(mp4url_list, date_list)):
         # 番組表データベースからタイトルと出演者情報を取得
         try:
             cur = con.cursor()
-            cur.execute('SELECT * FROM programs WHERE kouza=? and date=?', (kouzaname, date))
+            cur.execute(
+                "SELECT * FROM programs WHERE kouza=? and date=?", (kouzaname, date)
+            )
             program = cur.fetchone()
-            title = program['title']
-            artist = program['artist']
+            title = program["title"]
+            artist = program["artist"]
             reair = False
-        except Exception:
+        except Exception as e:
             # データベースから取得できないときは暫定タグを設定
-            title = '{date}_{kouzaname}'.format(kouzaname=kouzaname, date=date.strftime('%Y_%m_%d'))
-            artist = 'NHK'
+            title = "{date}_{kouzaname}".format(
+                kouzaname=kouzaname, date=date.strftime("%Y_%m_%d")
+            )
+            artist = "NHK"
             reair = True
-            print('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
-            logging.info('番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。')
+            if isinstance(e, TypeError):
+                logger.warning("番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。")
+            else:
+                logger.error(e)
 
-        tmpfile = os.path.join(TMPDIR, '{kouza}_{date}.mp4'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
+        tmpfile = TMPDIR / "{kouza}_{date}.mp4".format(
+            kouza=kouzaname, date=date.strftime("%Y_%m_%d")
+        )
+
         if reair:
-            mp3file = os.path.join(
-                TMPOUTDIR, '{kouza}_{date}.mp3'.format(
-                    kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
+            mp3file = TMPOUTDIR / "{kouza}_{date}.mp3".format(
+                kouza=kouzaname, date=date.strftime("%Y_%m_%d")
+            )
         else:
-            mp3file = os.path.join(OUTDIR, '{kouza}_{date}.mp3'.format(kouza=kouzaname, date=date.strftime('%Y_%m_%d')))
+            mp3file = OUTDIR / "{kouza}_{date}.mp3".format(
+                kouza=kouzaname, date=date.strftime("%Y_%m_%d")
+            )
 
         if mp3file in existed_track_list:
             existed_track_numbter = existed_track_numbter - 1
 
-        if os.path.isfile(mp3file):
-            if os.path.getsize(mp3file) > 3000000:
-                print(mp3file + ' still exist. skip.')
-                logging.info('skip {} {}'.format(albumname, os.path.basename(mp3file)))
+        if mp3file.is_file():
+            if mp3file.stat().st_size > 3000000:
+                logger.info(
+                    "{} still exist. Skip {} {}".format(
+                        mp3file.name, albumname, mp3file.name
+                    )
+                )
                 continue
         else:
-            print('download ' + mp3file)
+            logger.info("download " + mp3file.name)
         try:
-            cmd_args = [ffmpeg, '-y', '-i', mp4url, '-vn', '-bsf', 'aac_adtstoasc', '-acodec', 'copy', tmpfile]
+            cmd_args = [
+                ffmpeg,
+                "-y",
+                "-i",
+                mp4url,
+                "-vn",
+                "-bsf",
+                "aac_adtstoasc",
+                "-acodec",
+                "copy",
+                str(tmpfile),
+            ]
             check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
         except CalledProcessError as e:
-            print('コマンドの実行に失敗．\n' + ' '.join(cmd_args))
-            raise e
+            logger.error("ストリーミングファイルのダウンロードに失敗しました．")
+            raise CommandExecError(e)
         try:
-            cmd_args = [ffmpeg, '-i', tmpfile, '-vn', '-acodec', 'libmp3lame', '-ar', '22050',
-                        '-ac', '1', '-ab', '48k', mp3file]
+            cmd_args = [
+                ffmpeg,
+                "-i",
+                str(tmpfile),
+                "-vn",
+                "-acodec",
+                "libmp3lame",
+                "-ar",
+                "22050",
+                "-ac",
+                "1",
+                "-ab",
+                "48k",
+                str(mp3file),
+            ]
             check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
         except CalledProcessError as e:
-            print('コマンドの実行に失敗．\n' + ' '.join(cmd_args))
-            raise e
-        logging.info('完了: {} {}'.format(albumname, os.path.basename(mp3file)))
+            logger.error("MP3ファイルへの変換に失敗しました．")
+            raise CommandExecError(e)
+        logger.info("完了: {} {}".format(albumname, os.path.basename(mp3file)))
+        time.sleep(1)
 
         # mp3タグを設定
-        setmp3tag(mp3file,
-                  image=imgfile,
-                  title=title,
-                  artist=artist,
-                  album=albumname,
-                  genre='Speech',
-                  track_num=None if reair else existed_track_numbter + number_on_week + 1,
-                  total_track_num=total_track_num,
-                  year=text_year,
-                  disc_num=1,
-                  total_disc_num=1
-                  )
+        setmp3tag(
+            mp3file,
+            image=imgfile,
+            title=title,
+            artist=artist,
+            album=albumname,
+            genre="Speech",
+            track_num=None if reair else existed_track_numbter + number_on_week + 1,
+            total_track_num=total_track_num,
+            year=text_year,
+            disc_num=1,
+            total_disc_num=1,
+        )
 
     con.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if SENTRY_DSN_KEY is not None:
         sentry_logging = LoggingIntegration(
-            level=logging.INFO,        # Capture info and above as breadcrumbs
-            event_level=logging.ERROR  # Send errors as events
+            level=logging.INFO,  # Capture info and above as breadcrumbs
+            event_level=logging.WARN,  # Send errors as events
         )
-        sentry_sdk.init(
-            dsn=SENTRY_DSN_KEY,
-            integrations=[sentry_logging]
-        )
+        sentry_sdk.init(dsn=SENTRY_DSN_KEY, integrations=[sentry_logging])
     for kouzaname, site_id, kouzano in KOUZALIST:
-        streamedump(kouzaname, site_id, kouzano)
+        try:
+            streamedump(kouzaname, site_id, kouzano)
+        except CommandExecError as e:
+            logger.error(e)
