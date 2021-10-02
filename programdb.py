@@ -1,8 +1,9 @@
+import logging
 import re
 import sqlite3
 from datetime import datetime
 from typing import Optional
-import logging
+
 import jaconv
 import pandas as pd
 import requests
@@ -19,7 +20,7 @@ from settings import (
     PROGRAMLIST,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("programdb")
 
 
 def getKouza(title: str) -> Optional[str]:

@@ -32,7 +32,7 @@ from settings import (
 )
 from util import dict_factory
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("nhkstream")
 
 
 # mp3ファイルにタグを保存する

@@ -108,4 +108,5 @@ SENTRY_DSN_KEY: Optional[str] = os.environ.get("SENTRY_DSN_KEY", None)
 # ロガー
 stream_handler = StreamHandler()
 stream_handler.setLevel(logging.INFO)
-logging.basicConfig(level=logging.NOTSET, handlers=[stream_handler])
+FORAT = "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d %(message)s"
+logging.basicConfig(level=logging.NOTSET, handlers=[stream_handler], format=FORAT)
