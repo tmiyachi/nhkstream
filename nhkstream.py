@@ -123,7 +123,7 @@ class CommandExecError(Exception):
 
 
 # メイン関数
-def streamedump(kouzaname: str, site_id: str, kouzano: int) -> None:
+def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
     # ファイル名と放送日リストの取得
     oparser = ondemandParser(site_id)
     mp4url_list = oparser.get_mp4url_list()
@@ -175,14 +175,20 @@ def streamedump(kouzaname: str, site_id: str, kouzano: int) -> None:
     # ジャケット画像ファイルを取得する
     imgfile: Optional[Path] = None
     try:
+        if text_month in [1, 2, 3]:
+            annual = text_year - 1
+        else:
+            annual = text_year
         if text_month == 1:
             # 1月号のテキストのサムネイルは前年の1月になる
             imgurl = IMGURL.format(
-                kouzano=kouzano, date=("{:02d}{:04d}".format(text_month, text_year - 1))
+                booknum=booknum.format(
+                    month=text_month, year=text_year - 1, annual=annual
+                )
             )
         else:
             imgurl = IMGURL.format(
-                kouzano=kouzano, date=("{:02d}{:04d}".format(text_month, text_year))
+                booknum=booknum.format(month=text_month, year=text_year, annual=annual)
             )
         imgfile = TMPDIR / os.path.basename(imgurl)
         imgdata = urllib.request.urlopen(imgurl)
@@ -313,8 +319,8 @@ if __name__ == "__main__":
             event_level=logging.WARN,  # Send errors as events
         )
         sentry_sdk.init(dsn=SENTRY_DSN_KEY, integrations=[sentry_logging])
-    for kouzaname, site_id, kouzano in KOUZALIST:
+    for kouzaname, site_id, booknum in KOUZALIST:
         try:
-            streamedump(kouzaname, site_id, kouzano)
+            streamedump(kouzaname, site_id, booknum)
         except CommandExecError as e:
             logger.error(e)
