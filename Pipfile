@@ -19,6 +19,7 @@ jaconv = "*"
 python-dateutil = "*"
 mutagen = "*"
 sentry-sdk = "*"
+python-dotenv = "*"
 
 [requires]
 python_version = "3.8"
