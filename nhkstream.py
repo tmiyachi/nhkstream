@@ -293,7 +293,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
         try_count = 0
         while not success:
             try:
-                try_count = 1
+                try_count += 1
                 cmd_args = [
                     ffmpeg,
                     "-y",
