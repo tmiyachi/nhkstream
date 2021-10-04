@@ -160,6 +160,14 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 if mp3file.name not in mp3file_list
             ]
         )
+        # 4週分の講座数
+        if "入門編" in kouzaname:
+            max_kouzanum = 3 * 4
+        elif "中級編" in kouzaname or "応用編" in kouzaname:
+            max_kouzanum = 2 * 4
+        else:
+            max_kouzanum = len(date_list) * 4
+
         if existed_track_num == 0:
             # ファイルがなければ新講座扱いで何週目かで判定（失敗する場合もある）
             if (this_week_tuesday.day - 1) // 7 + 1 == 5:
@@ -170,7 +178,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 # 第5週でなければ前号
                 text_year = this_week_tuesday.year
                 text_month = this_week_tuesday.month
-        elif existed_track_num >= len(date_list) * 4:
+        elif existed_track_num >= max_kouzanum:
             # 4週分既にあれば次号扱い
             text_year = this_week_friday.year
             text_month = this_week_friday.month
