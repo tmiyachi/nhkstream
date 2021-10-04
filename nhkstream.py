@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Union
 import requests
 import sentry_sdk
 from dateutil import parser
-from dateutil.relativedelta import FR, TU, relativedelta
+from dateutil.relativedelta import FR, MO, TU, relativedelta
 from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK, TYER
 from mutagen.mp3 import MP3
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -135,25 +135,51 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
     date_list = oparser.get_date_list()
 
     # ストリーミングの日付から何月号のテキストかを調べる
+    this_week_monday = date_list[0] + relativedelta(weekday=MO)
     this_week_tuesday = date_list[0] + relativedelta(weekday=TU)
     this_week_friday = date_list[0] + relativedelta(weekday=FR)
-    if this_week_tuesday.month == this_week_friday.month:
+    if this_week_monday.month == this_week_friday.month:
         # 週のはじめと終わりが同じ場合は初日と同じ月が該当月
-        text_year = this_week_tuesday.year
-        text_month = this_week_tuesday.month
+        text_year = this_week_monday.year
+        text_month = this_week_monday.month
     else:
-        # 週のはじめと終わりが違う場合は前週か次週の月のテキスト
-        if (this_week_tuesday.day - 1) // 7 + 1 == 5:
-            # 火曜日が第5週なら次号
+        # 週のはじめと終わりが違う場合は月曜日の月号のファイルをカウントし1か月分以上あれば次放送とする
+        text_year = this_week_monday.year
+        text_month = this_week_monday.month
+
+        # 同名ファイルを除いたファイル数をカウント
+        mp3file_list = [
+            "{kouza}_{date}.mp3".format(kouza=kouzaname, date=date.strftime("%Y_%m_%d"))
+            for date in date_list
+        ]
+        OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
+        existed_track_num = len(
+            [
+                mp3file
+                for mp3file in OUTDIR.glob("*.mp3")
+                if mp3file.name not in mp3file_list
+            ]
+        )
+        if existed_track_num == 0:
+            # ファイルがなければ新講座扱いで何週目かで判定（失敗する場合もある）
+            if (this_week_tuesday.day - 1) // 7 + 1 == 5:
+                # 火曜日が第5週なら次号
+                text_year = this_week_friday.year
+                text_month = this_week_friday.month
+            else:
+                # 第5週でなければ前号
+                text_year = this_week_tuesday.year
+                text_month = this_week_tuesday.month
+        elif existed_track_num >= len(date_list) * 4:
+            # 4週分既にあれば次号扱い
             text_year = this_week_friday.year
             text_month = this_week_friday.month
         else:
-            # 第5週でなければ前号
-            text_year = this_week_tuesday.year
-            text_month = this_week_tuesday.month
-
+            text_year = this_week_monday.year
+            text_month = this_week_monday.month
     # アルバム名
     albumname = f"{kouzaname}{text_year:d}年{text_month:02d}月号"
+    logger.info("ダウンロード開始：" + albumname)
 
     # ディレクトリの作成
     TMPDIR = TMPBASEDIR / "nhkdump"
@@ -172,7 +198,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
 
     # トータルトラック数を決定する
     if kouzaname == "英会話タイムトライアル" and text_month == 5:
-        # 英会話タイムトライアルは5月は他講座より再放送が1週多い
+        # 英会話タイムトライアルは5月は他講座より再放送が1週少ない
         total_track_num = len(date_list) * 3
     else:
         total_track_num = len(date_list) * 4
