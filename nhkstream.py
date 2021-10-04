@@ -285,11 +285,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
 
         if mp3file.is_file():
             if mp3file.stat().st_size > 3000000:
-                logger.info(
-                    "{} still exist. Skip {} {}".format(
-                        mp3file.name, albumname, mp3file.name
-                    )
-                )
+                logger.info("{} still exist. Skip".format(mp3file.name))
                 continue
         else:
             logger.info("download " + mp3file.name)
