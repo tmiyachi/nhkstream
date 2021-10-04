@@ -293,23 +293,33 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 continue
         else:
             logger.info("download " + mp3file.name)
-        try:
-            cmd_args = [
-                ffmpeg,
-                "-y",
-                "-i",
-                mp4url,
-                "-vn",
-                "-bsf",
-                "aac_adtstoasc",
-                "-acodec",
-                "copy",
-                str(tmpfile),
-            ]
-            check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
-        except CalledProcessError as e:
-            logger.error("ストリーミングファイルのダウンロードに失敗しました．")
-            raise CommandExecError(e)
+        success = False
+        try_count = 0
+        while not success:
+            try:
+                try_count = 1
+                cmd_args = [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    mp4url,
+                    "-vn",
+                    "-bsf",
+                    "aac_adtstoasc",
+                    "-acodec",
+                    "copy",
+                    str(tmpfile),
+                ]
+                check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
+                success = True
+            except CalledProcessError as e:
+                logger.error("ストリーミングファイルのダウンロードに失敗しました．")
+                if try_count >= 3:
+                    # 3回失敗したらやめる
+                    raise CommandExecError(e)
+                else:
+                    # 失敗したら5秒待ってリトライ
+                    time.sleep(5)
         try:
             cmd_args = [
                 ffmpeg,
