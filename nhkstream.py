@@ -101,12 +101,17 @@ class ondemandParser:
         self.info_list = [
             {
                 "mp4url": detail["file_list"][0]["file_name"],
-                "date": parser.parse(
-                    detail["file_list"][0]["aa_vinfo4"].split("_")[0]
-                ).replace(hour=0, minute=0, second=0, microsecond=0),
+                "date": self.truncate_dt(
+                    parser.parse(
+                        detail["file_list"][0]["aa_vinfo4"].split("_")[0]
+                    ).replace(hour=0, minute=0, second=0, microsecond=0)
+                ),
             }
             for detail in res.json()["main"]["detail_list"]
         ]
+
+    def truncate_dt(self, dt: datetime) -> datetime:
+        return datetime(dt.year, dt.month, dt.day)
 
     def get_info_list(self) -> List[Dict[str, Any]]:
         return self.info_list
