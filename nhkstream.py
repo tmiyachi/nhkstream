@@ -308,6 +308,8 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 success = True
             except CalledProcessError as e:
                 logger.error("ストリーミングファイルのダウンロードに失敗しました．")
+                if tmpfile.exists():
+                    tmpfile.unlink()
                 if try_count >= 3:
                     # 3回失敗したらやめる
                     raise CommandExecError(e)
