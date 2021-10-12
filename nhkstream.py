@@ -282,13 +282,11 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
 
         if mp3file in existed_track_list:
             existed_track_numbter = existed_track_numbter - 1
-
         if mp3file.is_file():
             if mp3file.stat().st_size > 3000000:
                 logger.info("{} still exist. Skip".format(mp3file.name))
                 continue
-        else:
-            logger.info("download " + mp3file.name)
+        logger.info("download " + mp3file.name)
         success = False
         try_count = 0
         while not success:
@@ -306,7 +304,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                     "copy",
                     str(tmpfile),
                 ]
-                check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
+                check_call(cmd_args, stdout=FNULL, stderr=STDOUT, timeout=5*60)
                 success = True
             except CalledProcessError as e:
                 logger.error("ストリーミングファイルのダウンロードに失敗しました．")
@@ -353,6 +351,17 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
             disc_num=1,
             total_disc_num=1,
         )
+
+        # 失敗したファイルを削除
+        if mp3file.is_file():
+            if kouzaname == "英会話タイムトライアル":
+                # 英会話タイムトライアルは10分番組なのでサイズが小さい
+                default_size = 3500000
+            else:
+                default_size = 5000000
+            if mp3file.stat().st_size < default_size:
+                logger.error("fail to download {}. remove file".format(mp3file.name))
+                mp3file.unlink()
 
     con.close()
 
