@@ -286,7 +286,6 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
             if mp3file.stat().st_size > 3000000:
                 logger.info("{} still exist. Skip".format(mp3file.name))
                 continue
-        logger.info("download " + mp3file.name)
         success = False
         try_count = 0
         while not success:
@@ -304,7 +303,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                     "copy",
                     str(tmpfile),
                 ]
-                check_call(cmd_args, stdout=FNULL, stderr=STDOUT, timeout=5*60)
+                check_call(cmd_args, stdout=FNULL, stderr=STDOUT, timeout=5 * 60)
                 success = True
             except CalledProcessError as e:
                 logger.error("ストリーミングファイルのダウンロードに失敗しました．")
