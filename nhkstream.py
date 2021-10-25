@@ -8,7 +8,7 @@ import time
 import urllib.request
 from datetime import datetime
 from pathlib import Path
-from subprocess import STDOUT, CalledProcessError, check_call
+from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_call
 from typing import Any, Dict, List, Optional, Union
 
 import requests
@@ -242,7 +242,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
     con = sqlite3.connect(DB_FILE)
     con.row_factory = dict_factory
 
-    # mp4ファイルをダウンロードしてmp3にファイルに変換する
+    # mp4ファイルをダウンロードしてmp3ファイルに変換する
     FNULL = open(os.devnull, "w")
     for number_on_week, (mp4url, date) in enumerate(zip(mp4url_list, date_list)):
         # 番組表データベースからタイトルと出演者情報を取得
@@ -306,15 +306,18 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 check_call(cmd_args, stdout=FNULL, stderr=STDOUT, timeout=5 * 60)
                 success = True
             except CalledProcessError as e:
-                logger.error("ストリーミングファイルのダウンロードに失敗しました．")
                 if tmpfile.exists():
                     tmpfile.unlink()
                 if try_count >= 3:
                     # 3回失敗したらやめる
+                    logger.error("ストリーミングファイルのダウンロードに失敗しました．")
                     raise CommandExecError(e)
                 else:
                     # 失敗したら5秒待ってリトライ
                     time.sleep(5)
+            except TimeoutExpired as e:
+                logger.error("タイムアウトのためダウンロードを中止しました．")
+                raise CommandExecError(e)
         try:
             cmd_args = [
                 ffmpeg,
@@ -361,7 +364,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
             else:
                 default_size = 5000000
             if mp3file.stat().st_size < default_size:
-                logger.error("fail to download {}. remove file".format(mp3file.name))
+                logger.error("ダウンロードが完了しませんでした．")
                 mp3file.unlink()
 
     con.close()
@@ -371,11 +374,11 @@ if __name__ == "__main__":
     if SENTRY_DSN_KEY is not None:
         sentry_logging = LoggingIntegration(
             level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.WARN,  # Send errors as events
+            event_level=logging.ERROR,  # Send errors as events
         )
         sentry_sdk.init(dsn=SENTRY_DSN_KEY, integrations=[sentry_logging])
     for kouzaname, site_id, booknum in KOUZALIST:
         try:
             streamedump(kouzaname, site_id, booknum)
-        except CommandExecError as e:
-            logger.error(e)
+        except CommandExecError:
+            pass
