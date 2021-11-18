@@ -15,8 +15,8 @@ import requests
 import sentry_sdk
 from dateutil import parser
 from dateutil.relativedelta import FR, MO, TU, relativedelta
-from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1, TPE2, TPOS, TRCK, TYER
-from mutagen.mp3 import MP3
+from mutagen import MutagenError
+from mutagen.mp4 import MP4, MP4Cover
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 from settings import (
@@ -35,9 +35,9 @@ from util import dict_factory
 logger = logging.getLogger("nhkstream")
 
 
-# mp3ファイルにタグを保存する
-def setmp3tag(
-    mp3file,
+# mp4ファイルにタグを保存する
+def settag(
+    mp4file,
     image: Union[str, Path, None] = None,
     title: Optional[str] = None,
     album: Optional[str] = None,
@@ -49,49 +49,38 @@ def setmp3tag(
     disc_num: Optional[int] = None,
     total_disc_num: Optional[int] = None,
 ) -> None:
-    audio = MP3(mp3file, ID3=ID3)
+    audio = MP4(mp4file)
     try:
-        audio.add_tag()
-    except Exception:
+        audio.add_tags()
+    except MutagenError:
         pass
 
     if image is not None:
         with open(image, "rb") as f:
-            audio.tags.add(
-                APIC(
-                    encoding=3,
-                    mime="image/jpeg",
-                    type=3,
-                    desc="Cover Picture",
-                    data=f.read(),
-                )
-            )
+            audio.tags["covr"] = [MP4Cover(f.read(), imageformat=MP4Cover.FORMAT_JPEG)]
+
     if title is not None:
-        audio.tags.add(TIT2(encoding=3, text=title))
+        audio.tags["\xa9nam"] = title
     if album is not None:
-        audio.tags.add(TALB(encoding=3, text=album))
+        audio.tags["\xa9alb"] = album
     if artist is not None:
-        audio.tags.add(TPE1(encoding=3, text=artist))
-        audio.tags.add(TPE2(encoding=3, text=artist))
+        audio.tags["\xa9ART"] = artist  # artist
+        audio.tags["aART"] = artist  # album artist
     if track_num is not None:
         if total_track_num is None:
-            audio.tags.add(TRCK(encoding=3, text=str(track_num)))
+            audio.tags["trkn"] = [(track_num, track_num)]
         else:
-            audio.tags.add(
-                TRCK(encoding=3, text="{}/{}".format(track_num, total_track_num))
-            )
+            audio.tags["trkn"] = [(track_num, total_track_num)]
     if disc_num is not None:
         if total_disc_num is None:
-            audio.tags.add(TPOS(encoding=3, text=str(disc_num)))
+            audio.tags["disk"] = [(disc_num, disc_num)]
         else:
-            audio.tags.add(
-                TPOS(encoding=3, text="{}/{}".format(disc_num, total_disc_num))
-            )
+            audio.tags["disk"] = [(disc_num, total_disc_num)]
     if genre is not None:
-        audio.tags.add(TCON(encoding=3, text=genre))
+        audio.tags["\xa9gen"] = genre
     if year is not None:
-        audio.tags.add(TYER(encoding=3, text=str(year)))
-    audio.save(v2_version=3, v1=2)
+        audio.tags["\xa9day"] = str(year)
+    audio.save()
 
 
 class ondemandParser:
@@ -148,17 +137,13 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
         text_month = this_week_monday.month
 
         # 同名ファイルを除いたファイル数をカウント
-        mp3file_list = [
-            "{kouza}_{date}.mp3".format(kouza=kouzaname, date=date.strftime("%Y_%m_%d"))
+        file_list = [
+            "{kouza}_{date}.m4a".format(kouza=kouzaname, date=date.strftime("%Y_%m_%d"))
             for date in date_list
         ]
         OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
         existed_track_num = len(
-            [
-                mp3file
-                for mp3file in OUTDIR.glob("*.mp3")
-                if mp3file.name not in mp3file_list
-            ]
+            [file for file in OUTDIR.glob("*.m4a") if file.name not in file_list]
         )
         # 4週分の講座数
         if "入門編" in kouzaname:
@@ -200,8 +185,8 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
     if not OUTDIR.is_dir():
         os.makedirs(OUTDIR)
 
-    # 同じ保存ディレクトリに存在するmp3ファイルの数からタグに付加するトラックナンバーの開始数を決定する
-    existed_track_list = list(OUTDIR.glob("*.mp3"))
+    # 同じ保存ディレクトリに存在するファイルの数からタグに付加するトラックナンバーの開始数を決定する
+    existed_track_list = list(OUTDIR.glob("*.m4a"))
     existed_track_numbter = len(existed_track_list)
 
     # トータルトラック数を決定する
@@ -242,7 +227,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
     con = sqlite3.connect(DB_FILE)
     con.row_factory = dict_factory
 
-    # mp4ファイルをダウンロードしてmp3ファイルに変換する
+    # mp4ファイルをダウンロードする
     FNULL = open(os.devnull, "w")
     for number_on_week, (mp4url, date) in enumerate(zip(mp4url_list, date_list)):
         # 番組表データベースからタイトルと出演者情報を取得
@@ -261,30 +246,30 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 kouzaname=kouzaname, date=date.strftime("%Y_%m_%d")
             )
             artist = "NHK"
-            reair = True
+            reair = False
             if isinstance(e, TypeError):
                 logger.warning("番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。")
             else:
                 logger.error(e)
 
-        tmpfile = TMPDIR / "{kouza}_{date}.mp4".format(
+        tmpfile = TMPDIR / "{kouza}_{date}.m4a".format(
             kouza=kouzaname, date=date.strftime("%Y_%m_%d")
         )
 
         if reair:
-            mp3file = TMPOUTDIR / "{kouza}_{date}.mp3".format(
+            audiofile = TMPOUTDIR / "{kouza}_{date}.m4a".format(
                 kouza=kouzaname, date=date.strftime("%Y_%m_%d")
             )
         else:
-            mp3file = OUTDIR / "{kouza}_{date}.mp3".format(
+            audiofile = OUTDIR / "{kouza}_{date}.m4a".format(
                 kouza=kouzaname, date=date.strftime("%Y_%m_%d")
             )
 
-        if mp3file in existed_track_list:
+        if audiofile in existed_track_list:
             existed_track_numbter = existed_track_numbter - 1
-        if mp3file.is_file():
-            if mp3file.stat().st_size > 3000000:
-                logger.info("{} still exist. Skip".format(mp3file.name))
+        if audiofile.is_file():
+            if audiofile.stat().st_size > 3000000:
+                logger.info("{} still exist. Skip".format(audiofile.name))
                 continue
         success = False
         try_count = 0
@@ -297,8 +282,6 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                     "-i",
                     mp4url,
                     "-vn",
-                    "-bsf",
-                    "aac_adtstoasc",
                     "-acodec",
                     "copy",
                     str(tmpfile),
@@ -314,36 +297,30 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                     raise CommandExecError(e)
                 else:
                     # 失敗したら5秒待ってリトライ
+                    logger.info("'{}'のダウンロードに失敗．リトライします．".format(title))
                     time.sleep(5)
             except TimeoutExpired as e:
                 logger.error("タイムアウトのためダウンロードを中止しました．")
                 raise CommandExecError(e)
-        try:
-            cmd_args = [
-                ffmpeg,
-                "-i",
-                str(tmpfile),
-                "-vn",
-                "-acodec",
-                "libmp3lame",
-                "-ar",
-                "22050",
-                "-ac",
-                "1",
-                "-ab",
-                "48k",
-                str(mp3file),
-            ]
-            check_call(cmd_args, stdout=FNULL, stderr=STDOUT)
-        except CalledProcessError as e:
-            logger.error("MP3ファイルへの変換に失敗しました．")
-            raise CommandExecError(e)
-        logger.info("完了: {} {}".format(albumname, os.path.basename(mp3file)))
-        time.sleep(1)
 
-        # mp3タグを設定
-        setmp3tag(
-            mp3file,
+        # ダウンロードが正常に完了しなかった場合はファイルを削除して中止
+        if tmpfile.is_file():
+            if kouzaname == "英会話タイムトライアル":
+                # 英会話タイムトライアルは10分番組なのでサイズが小さい
+                default_size = 3500000
+            else:
+                default_size = 5000000
+            if tmpfile.stat().st_size < default_size:
+                logger.error("ダウンロードが完了しませんでした．")
+                tmpfile.unlink()
+                continue
+
+        # 保存先にコピー
+        shutil.copy(tmpfile, audiofile)
+
+        # タグを設定
+        settag(
+            audiofile,
             image=imgfile,
             title=title,
             artist=artist,
@@ -355,17 +332,6 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
             disc_num=1,
             total_disc_num=1,
         )
-
-        # 失敗したファイルを削除
-        if mp3file.is_file():
-            if kouzaname == "英会話タイムトライアル":
-                # 英会話タイムトライアルは10分番組なのでサイズが小さい
-                default_size = 3500000
-            else:
-                default_size = 5000000
-            if mp3file.stat().st_size < default_size:
-                logger.error("ダウンロードが完了しませんでした．")
-                mp3file.unlink()
 
     con.close()
 
@@ -380,5 +346,6 @@ if __name__ == "__main__":
     for kouzaname, site_id, booknum in KOUZALIST:
         try:
             streamedump(kouzaname, site_id, booknum)
-        except CommandExecError:
+        except CommandExecError as e:
+            raise e
             pass
