@@ -35,21 +35,37 @@ def get_func(nums):
     return func
 
 
-# 先々週放送された番組タイトルのリストを取得
-conn = sqlite3.connect(DB_FILE)
-mon_bfrkstweek = datetime.today() + relativedelta(
-    weeks=-2, weekday=MO(-1), hour=0, minute=0, second=0
-)
-sql = 'SELECT * FROM programs WHERE date BETWEEN "{}" and "{}"'.format(
-    mon_bfrkstweek.strftime("%Y-%m-%d"),
-    (mon_bfrkstweek + relativedelta(days=6)).strftime("%Y-%m-%d"),
-)
-df_bfrlstweek = pd.read_sql(sql, conn)
+def sql_one_week(mon: datetime) -> str:
+    return 'SELECT * FROM programs WHERE date BETWEEN "{}" and "{}"'.format(
+        mon.strftime("%Y-%m-%d"), (mon + relativedelta(days=6)).strftime("%Y-%m-%d")
+    )
 
-# タイトルと日付を変更して取得できなかった先週分を強制的に追加
-# 英会話タイムトライアルと現代英語はタイトルの規則性が弱いので確認してDBを変更する
-for _, gr in df_bfrlstweek.groupby("kouza"):
-    func = get_func(len(gr))
-    gr = gr.apply(func, axis=1)
-    gr.to_sql("programs", conn, index=False, if_exists="append")
-conn.close()
+
+# 先々週放送された番組タイトルのリストを取得
+with sqlite3.connect(DB_FILE) as conn:
+    # 先週月曜日
+    mon_last_week = datetime.today() + relativedelta(
+        weeks=-1, weekday=MO(-1), hour=0, minute=0, second=0, microsecond=0
+    )
+    # 先々週の月曜日
+    mon_the_week_befor_last = mon_last_week + relativedelta(weeks=-1)
+
+    if len(pd.read_sql(sql_one_week(mon_last_week), conn)) > 0:
+        print("先週放送された番組のレコードが残っています．削除してから実行してください．")
+    else:
+        df_bfrlstweek = pd.read_sql(sql_one_week(mon_the_week_befor_last), conn)
+
+        # タイトルと日付を変更して取得できなかった先週分を強制的に追加
+        # 英会話タイムトライアルと現代英語はタイトルの規則性が弱いので確認してDBを変更する
+        for _, gr in df_bfrlstweek.groupby("kouza"):
+            func = get_func(len(gr))
+            gr = gr.apply(func, axis=1)
+            gr.to_sql("programs", conn, index=False, if_exists="append")
+
+        # 追加されたレコードの確認
+        df_lstweek = pd.read_sql(sql_one_week(mon_last_week), conn)
+        print(
+            "追加されたレコード：{}, 追加された番組：{}".format(
+                len(df_lstweek), len(df_lstweek.kouza.unique())
+            )
+        )
