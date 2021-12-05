@@ -316,7 +316,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 continue
 
         # 保存先にコピー
-        shutil.copy(tmpfile, audiofile)
+        shutil.copyfile(tmpfile, audiofile)
 
         # タグを設定
         settag(
