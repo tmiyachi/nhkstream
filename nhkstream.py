@@ -286,6 +286,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                     "copy",
                     str(tmpfile),
                 ]
+                # print(" ".join(cmd_args))
                 check_call(cmd_args, stdout=FNULL, stderr=STDOUT, timeout=5 * 60)
                 success = True
             except CalledProcessError as e:
@@ -347,5 +348,5 @@ if __name__ == "__main__":
         try:
             streamedump(kouzaname, site_id, booknum)
         except CommandExecError as e:
-            raise e
+            logger.info(kouzaname + "のダウンロードを中止")
             pass
