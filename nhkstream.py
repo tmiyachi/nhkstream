@@ -123,27 +123,29 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
     mp4url_list = oparser.get_mp4url_list()
     date_list = oparser.get_date_list()
 
-    # ストリーミングの日付から何月号のテキストかを調べる
-    this_week_monday = date_list[0] + relativedelta(weekday=MO)
-    this_week_tuesday = date_list[0] + relativedelta(weekday=TU)
-    this_week_friday = date_list[0] + relativedelta(weekday=FR)
-    if this_week_monday.month == this_week_friday.month:
-        # 週のはじめと終わりが同じ場合は初日と同じ月が該当月
-        text_year = this_week_monday.year
-        text_month = this_week_monday.month
-    else:
-        # 週のはじめと終わりが違う場合は月曜日の月号のファイルをカウントし1か月分以上あれば次放送とする
+    # 番組表データベースに接続
+    con = sqlite3.connect(DB_FILE)
+    con.row_factory = dict_factory
+
+    # mp4ファイルをダウンロードする
+    FNULL = open(os.devnull, "w")
+    for mp4url, date in zip(mp4url_list, date_list):
+        # ストリーミングの日付から何月号のテキストかを調べる
+        this_week_monday = date + relativedelta(weekday=MO)
+        this_week_tuesday = date + relativedelta(weekday=TU)
+        this_week_friday = date + relativedelta(weekday=FR)
+        # 月曜日の月号のファイルをカウントし1か月分以上あれば次放送とする
         text_year = this_week_monday.year
         text_month = this_week_monday.month
 
+        filename = "{kouza}_{date}.m4a".format(kouza=kouzaname, date=date.strftime("%Y_%m_%d"))
         # 同名ファイルを除いたファイル数をカウント
-        file_list = [
-            "{kouza}_{date}.m4a".format(kouza=kouzaname, date=date.strftime("%Y_%m_%d"))
-            for date in date_list
-        ]
         OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
+        existed_file_list = [file.name for file in OUTDIR.glob("*.m4a")]
+        if filename in existed_file_list:
+            continue
         existed_track_num = len(
-            [file for file in OUTDIR.glob("*.m4a") if file.name not in file_list]
+            [file for file in OUTDIR.glob("*.m4a") if file.name != filename]
         )
         # 4週分の講座数
         if "入門編" in kouzaname:
@@ -151,11 +153,14 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
         elif "中級編" in kouzaname or "応用編" in kouzaname:
             max_kouzanum = 2 * 4
         else:
-            max_kouzanum = len(date_list) * 4
-
+            max_kouzanum = (len(date_list) - 1)* 4
         if existed_track_num == 0:
             # ファイルがなければ新講座扱いで何週目かで判定（失敗する場合もある）
-            if (this_week_tuesday.day - 1) // 7 + 1 == 5:
+            if this_week_monday.month == this_week_friday:
+                # 週のはじめと終わりが同じ月なら今号
+                text_year = this_week_monday.year
+                text_month = this_week_monday.month
+            elif (this_week_tuesday.day - 1) // 7 + 1 == 5:
                 # 火曜日が第5週なら次号
                 text_year = this_week_friday.year
                 text_month = this_week_friday.month
@@ -165,71 +170,70 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 text_month = this_week_tuesday.month
         elif existed_track_num >= max_kouzanum:
             # 4週分既にあれば次号扱い
-            text_year = this_week_friday.year
-            text_month = this_week_friday.month
+            text_year = (this_week_monday + relativedelta(months=1)).year
+            text_month = (this_week_monday + relativedelta(months=1)).month
         else:
             text_year = this_week_monday.year
             text_month = this_week_monday.month
-    # アルバム名
-    albumname = f"{kouzaname}{text_year:d}年{text_month:02d}月号"
-    logger.info("ダウンロード開始：" + albumname)
 
-    # ディレクトリの作成
-    TMPDIR = TMPBASEDIR / "nhkdump"
-    # アルバム名のディレクトリに保存する
-    OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
+        # アルバム名
+        albumname = f"{kouzaname}{text_year:d}年{text_month:02d}月号"
 
-    if TMPDIR.is_dir():
-        shutil.rmtree(TMPDIR, ignore_errors=True)
-    os.makedirs(TMPDIR)
-    if not OUTDIR.is_dir():
-        os.makedirs(OUTDIR)
+        # ディレクトリの作成
+        TMPDIR = TMPBASEDIR / "nhkdump"
+        # アルバム名のディレクトリに保存する
+        OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
 
-    # 同じ保存ディレクトリに存在するファイルの数からタグに付加するトラックナンバーの開始数を決定する
-    existed_track_list = list(OUTDIR.glob("*.m4a"))
-    existed_track_numbter = len(existed_track_list)
+        if TMPDIR.is_dir():
+            shutil.rmtree(TMPDIR, ignore_errors=True)
+        os.makedirs(TMPDIR)
+        if not OUTDIR.is_dir():
+            os.makedirs(OUTDIR)
 
-    # トータルトラック数を決定する
-    if kouzaname == "英会話タイムトライアル" and text_month == 5:
-        # 英会話タイムトライアルは5月は他講座より再放送が1週少ない
-        total_track_num = len(date_list) * 3
-    else:
-        total_track_num = len(date_list) * 4
+        # 同じ保存ディレクトリに存在するファイルの数からタグに付加するトラックナンバーの開始数を決定する
+        existed_track_list = list(OUTDIR.glob("*.m4a"))
+        existed_track_numbter = len(existed_track_list)
 
-    # ジャケット画像ファイルを取得する
-    imgfile: Optional[Path] = None
-    try:
-        if text_month in [1, 2, 3]:
-            annual = text_year - 1
+        # トータルトラック数を決定する
+        if kouzaname == "英会話タイムトライアル" and text_month == 5:
+            # 英会話タイムトライアルは5月は他講座より再放送が1週少ない
+            total_track_num = 5 * 3
         else:
-            annual = text_year
-        if text_month == 1:
-            # 1月号のテキストのサムネイルは前年の1月になる
-            imgurl = IMGURL.format(
-                booknum=booknum.format(
-                    month=text_month, year=text_year - 1, annual=annual
+            total_track_num = 5 * 4
+
+        # ジャケット画像ファイルを取得する
+        imgfile: Optional[Path] = None
+        try:
+            if text_month in [1, 2, 3]:
+                annual = text_year - 1
+            else:
+                annual = text_year
+            if text_month == 1:
+                # 1月号のテキストのサムネイルは前年の1月になる
+                imgurl = IMGURL.format(
+                    booknum=booknum.format(
+                        month=text_month, year=text_year - 1, annual=annual
+                    )
                 )
-            )
-        else:
-            imgurl = IMGURL.format(
-                booknum=booknum.format(month=text_month, year=text_year, annual=annual)
-            )
-        imgfile = TMPDIR / os.path.basename(imgurl)
-        imgdata = urllib.request.urlopen(imgurl)
-        with open(imgfile, "wb") as f:
-            f.write(imgdata.read())
-        imgdata.close()
-    except (urllib.error.HTTPError, urllib.error.URLError):
-        logger.warning("ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。")
-        imgfile = None
+            else:
+                imgurl = IMGURL.format(
+                    booknum=booknum.format(
+                        month=text_month, year=text_year, annual=annual
+                    )
+                )
+            imgfile = TMPDIR / os.path.basename(imgurl)
+            imgdata = urllib.request.urlopen(imgurl)
+            with open(imgfile, "wb") as f:
+                f.write(imgdata.read())
+            imgdata.close()
+        except (urllib.error.HTTPError, urllib.error.URLError):
+            logger.warning("ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。")
+            imgfile = None
 
-    # 番組表データベースに接続
-    con = sqlite3.connect(DB_FILE)
-    con.row_factory = dict_factory
+        # 番組表データベースに接続
+        con = sqlite3.connect(DB_FILE)
+        con.row_factory = dict_factory
 
-    # mp4ファイルをダウンロードする
-    FNULL = open(os.devnull, "w")
-    for number_on_week, (mp4url, date) in enumerate(zip(mp4url_list, date_list)):
         # 番組表データベースからタイトルと出演者情報を取得
         try:
             cur = con.cursor()
@@ -265,11 +269,12 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 kouza=kouzaname, date=date.strftime("%Y_%m_%d")
             )
 
+        logger.info(f"ダウンロード開始：{albumname}:{audiofile.name}")
         if audiofile in existed_track_list:
             existed_track_numbter = existed_track_numbter - 1
         if audiofile.is_file():
             if audiofile.stat().st_size > 3000000:
-                logger.info("{} still exist. Skip".format(audiofile.name))
+                logger.info(f"{audiofile.name} still exist. Skip")
                 continue
         success = False
         try_count = 0
@@ -327,7 +332,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
             artist=artist,
             album=albumname,
             genre="Speech",
-            track_num=None if reair else existed_track_numbter + number_on_week + 1,
+            track_num=None if reair else existed_track_numbter + 1,
             total_track_num=total_track_num,
             year=text_year,
             disc_num=1,
@@ -347,6 +352,6 @@ if __name__ == "__main__":
     for kouzaname, site_id, booknum in KOUZALIST:
         try:
             streamedump(kouzaname, site_id, booknum)
-        except CommandExecError as e:
+        except CommandExecError:
             logger.info(kouzaname + "のダウンロードを中止")
             pass
