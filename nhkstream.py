@@ -138,7 +138,9 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
         text_year = this_week_monday.year
         text_month = this_week_monday.month
 
-        filename = "{kouza}_{date}.m4a".format(kouza=kouzaname, date=date.strftime("%Y_%m_%d"))
+        filename = "{kouza}_{date}.m4a".format(
+            kouza=kouzaname, date=date.strftime("%Y_%m_%d")
+        )
         # 同名ファイルを除いたファイル数をカウント
         OUTDIR = OUTBASEDIR / kouzaname / f"{text_year:d}年{text_month:02d}月号"
         existed_file_list = [file.name for file in OUTDIR.glob("*.m4a")]
@@ -153,7 +155,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
         elif "中級編" in kouzaname or "応用編" in kouzaname:
             max_kouzanum = 2 * 4
         else:
-            max_kouzanum = (len(date_list) - 1)* 4
+            max_kouzanum = (len(date_list) - 1) * 4
         if existed_track_num == 0:
             # ファイルがなければ新講座扱いで何週目かで判定（失敗する場合もある）
             if this_week_monday.month == this_week_friday:
@@ -250,7 +252,7 @@ def streamedump(kouzaname: str, site_id: str, booknum: str) -> None:
                 kouzaname=kouzaname, date=date.strftime("%Y_%m_%d")
             )
             artist = "NHK"
-            reair = False
+            reair = True
             if isinstance(e, TypeError):
                 logger.warning("番組表データベースに番組が見つかりませんでした。再放送の可能性が高いため一時ディレクトリに保存します。")
             else:
