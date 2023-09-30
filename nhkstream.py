@@ -9,7 +9,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_call
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Tuple, Optional, Union
 
 import requests
 import sentry_sdk
@@ -118,7 +118,7 @@ class CommandExecError(Exception):
 
 def get_textbook_volume(
     kouzaname: str, date: datetime, max_kouzanum: int
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
     """放送日から何月号のテキストかを判定する"""
 
     this_week_monday = date + relativedelta(weekday=MO)
@@ -296,7 +296,7 @@ def streamedump(kouzaname: str, site_id: str, textbook_id_format: str) -> None:
                     "copy",
                     str(tmpfile),
                 ]
-                check_call(cmd_args, stdout=STDOUT, stderr=STDOUT, timeout=5 * 60)
+                check_call(cmd_args, stdout=FNULL, stderr=STDOUT, timeout=5 * 60)
                 success = True
             except CalledProcessError as e:
                 if tmpfile.exists():
