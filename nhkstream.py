@@ -152,7 +152,7 @@ def get_textbook_volume(
             # 火曜日が第5週でなければ前号とする
             textbook_year = this_week_tuesday.year
             textbook_month = this_week_tuesday.month
-    elif len(file_list) >= max_kouzanum:
+    elif len(file_list) > max_kouzanum:
         # 4週分既に取得済みであれば次号扱いとする
         textbook_year = (this_week_monday + relativedelta(months=1)).year
         textbook_month = (this_week_monday + relativedelta(months=1)).month
