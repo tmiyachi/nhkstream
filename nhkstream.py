@@ -197,15 +197,13 @@ def streamedump(kouzaname: str, site_id: str, textbook_id_format: str) -> None:
 
     # mp4ファイルをダウンロードする
     FNULL = open(os.devnull, "w")
+    TMPDIR = TMPBASEDIR / "nhkdump"
+    if TMPDIR.is_dir():
+        shutil.rmtree(TMPDIR, ignore_errors=True)
+    TMPDIR.mkdir(parents=True)
     for mp4url, date in zip(mp4url_list, date_list):
         textbook_year, textbook_month = get_textbook_volume(kouzaname, date, 4)
-
-        TMPDIR = TMPBASEDIR / "nhkdump"
         OUTDIR = OUTBASEDIR / kouzaname / f"{textbook_year:d}年{textbook_month:02d}月号"
-        if TMPDIR.is_dir():
-            shutil.rmtree(TMPDIR, ignore_errors=True)
-        else:
-            TMPDIR.mkdir(parents=True)
         if not OUTDIR.is_dir():
             OUTDIR.mkdir(parents=True)
 
