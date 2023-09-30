@@ -56,7 +56,7 @@ KOUZALIST: List[Tuple[str, str, str]] = [
 # らじるらじる聞き逃しjsonのURLテンプレート
 JSONURL: str = "https://www.nhk.or.jp/radioondemand/json/{site_id}/bangumi_{site_id}_01.json"  # noqa: E501
 # ファイルのサムネイルにするためのNHKテキストの画像ファイルのURLテンプレート
-IMGURL: str = "https://nhkbook.s3-ap-northeast-1.amazonaws.com/image/goods/{booknum}/{booknum}_01_420.jpg"  # noqa: E501
+IMGURL: str = "https://nhkbook.s3-ap-northeast-1.amazonaws.com/image/goods/{id}/{id}_01_420.jpg"  # noqa: E501
 
 # 出力ディレクトリ
 OUTBASEDIR: Path = Path(os.environ.get("OUTBASEDIR", default=BASEDIR / "Music" / "NHK"))
