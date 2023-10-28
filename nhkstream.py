@@ -9,7 +9,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_call
-from typing import Any, Dict, List, Tuple, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import requests
 import sentry_sdk
@@ -185,7 +185,9 @@ def get_img_url(
 
 
 # メイン関数
-def streamedump(kouzaname: str, site_id: str, textbook_id_format: str) -> None:
+def streamedump(
+    kouzaname: str, site_id: str, textbook_id_format: str, nums_week: int
+) -> None:
     # ファイル名と放送日リストの取得
     oparser = ondemandParser(site_id)
     mp4url_list = oparser.get_mp4url_list()
@@ -202,7 +204,16 @@ def streamedump(kouzaname: str, site_id: str, textbook_id_format: str) -> None:
         shutil.rmtree(TMPDIR, ignore_errors=True)
     TMPDIR.mkdir(parents=True)
     for mp4url, date in zip(mp4url_list, date_list):
-        textbook_year, textbook_month = get_textbook_volume(kouzaname, date, 4)
+        # トータルトラック数
+        if kouzaname == "英会話タイムトライアル" and date.month == 5:
+            # 英会話タイムトライアルは5月は他講座より再放送が1週少ない
+            total_track_num = 5 * 3
+        else:
+            total_track_num = 5 * 4
+
+        textbook_year, textbook_month = get_textbook_volume(
+            kouzaname, date, total_track_num
+        )
         OUTDIR = OUTBASEDIR / kouzaname / f"{textbook_year:d}年{textbook_month:02d}月号"
         if not OUTDIR.is_dir():
             OUTDIR.mkdir(parents=True)
@@ -351,9 +362,9 @@ if __name__ == "__main__":
             event_level=logging.ERROR,  # Send errors as events
         )
         sentry_sdk.init(dsn=SENTRY_DSN_KEY, integrations=[sentry_logging])
-    for kouzaname, site_id, booknum in KOUZALIST:
+    for kouzaname, site_id, booknum, nums_week in KOUZALIST:
         try:
-            streamedump(kouzaname, site_id, booknum)
+            streamedump(kouzaname, site_id, booknum, nums_week)
         except CommandExecError:
             logger.info(kouzaname + "のダウンロードを中止")
             pass
