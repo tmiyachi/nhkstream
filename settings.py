@@ -106,7 +106,7 @@ PROGRAMLIST: List[Tuple[str, str]] = [
 # NHK番組表API(https://api-portal.nhk.or.jp/ja)で使用するパラメータ
 NHK_AREA: int = 130
 NHK_SERVICE: str = "r2"
-NHK_GENRE: int = 1007
+NHK_GENRE: int = 1011
 NHK_APIKEY: str = os.environ.get("NHK_APIKEY", default="")
 NHK_PROGRAM_API: str = "https://api.nhk.or.jp/v2/pg/genre/{area}/{service}/{genre}/{date}.json?key={apikey}"
 
