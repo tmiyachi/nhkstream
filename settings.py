@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os.path
 from logging import StreamHandler
@@ -23,7 +25,7 @@ BASEDIR = Path(__file__).parent
 #  テキストの画像を取得するための番号のフォーマット文字列
 #  month:放送月,year:放送年,annual:放送年度
 #  weekday: 放送日
-KOUZALIST: List[Tuple[str, str, str, int, list[int]]] = [
+KOUZALIST: List[Tuple[str, str, str, list[int]]] = [
     ("ラジオ英会話", "PMMJ59J6N2", "000009137{month:02d}{year:04d}", [1, 2, 3, 4, 5]),
     ("英会話タイムトライアル", "8Z6XJ6J415", "000009105{month:02d}{year:04d}", [1, 2, 3, 4, 5]),
     ("ニュースで学ぶ「現代英語」", "77RQWQX1L6", None, [1, 2, 3, 4, 5]),
