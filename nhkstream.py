@@ -84,20 +84,24 @@ def settag(
 
 
 class ondemandParser:
-    def __init__(self, site_id: str):
+    def __init__(self, site_id: str, weekdays: list[int] | None = None):
         url = JSONURL.format(site_id=site_id)
         res = requests.get(url)
-        self.info_list = [
-            {
-                "mp4url": detail["file_list"][0]["file_name"],
+        info_list = [
+             {
+                "mp4url": d["stream_url"],
                 "date": self.truncate_dt(
                     parser.parse(
-                        detail["file_list"][0]["aa_vinfo4"].split("_")[0]
+                        d["aa_contents_id"].split("_")[-1]
                     ).replace(hour=0, minute=0, second=0, microsecond=0)
                 ),
             }
-            for detail in res.json()["main"]["detail_list"]
+            for d in res.json()["episodes"]
         ]
+        if weekdays is None:
+            self.info_list = info_list
+        else:
+            self.info_list = list(filter(lambda d: d["date"].isoweekday() in weekdays, info_list))
 
     def truncate_dt(self, dt: datetime) -> datetime:
         return datetime(dt.year, dt.month, dt.day)
@@ -117,7 +121,7 @@ class CommandExecError(Exception):
 
 
 def get_textbook_volume(
-    kouzaname: str, date: datetime, max_kouzanum: int
+    kouzaname: str, date: datetime, max_kouzanum: int,
 ) -> Tuple[int, int]:
     """放送日から何月号のテキストかを判定する"""
 
@@ -186,10 +190,10 @@ def get_img_url(
 
 # メイン関数
 def streamedump(
-    kouzaname: str, site_id: str, textbook_id_format: str, nums_week: int
+    kouzaname: str, site_id: str, textbook_id_format: str | None, weekdays: list[int] | None,
 ) -> None:
     # ファイル名と放送日リストの取得
-    oparser = ondemandParser(site_id)
+    oparser = ondemandParser(site_id, weekdays=weekdays)
     mp4url_list = oparser.get_mp4url_list()
     date_list = oparser.get_date_list()
 
@@ -233,15 +237,18 @@ def streamedump(
         audio_file_count = len(audio_file_list)
 
         # ジャケット画像ファイルを取得する
-        try:
-            img_url = get_img_url(textbook_year, textbook_month, textbook_id_format)
-            img_file = TMPDIR / os.path.basename(img_url)
-            img_data = urllib.request.urlopen(img_url)
-            with open(img_file, "wb") as f:
-                f.write(img_data.read())
-            img_data.close()
-        except (urllib.error.HTTPError, urllib.error.URLError):
-            logger.warning("ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。")
+        if textbook_id_format is not None:
+            try:
+                img_url = get_img_url(textbook_year, textbook_month, textbook_id_format)
+                img_file = TMPDIR / os.path.basename(img_url)
+                img_data = urllib.request.urlopen(img_url)
+                with open(img_file, "wb") as f:
+                    f.write(img_data.read())
+                img_data.close()
+            except (urllib.error.HTTPError, urllib.error.URLError):
+                logger.warning("ジャケット画像の取得に失敗しました。ジャケット画像なしで保存します。")
+                img_file = None
+        else:
             img_file = None
 
         # 番組表データベースに接続
@@ -362,9 +369,9 @@ if __name__ == "__main__":
             event_level=logging.ERROR,  # Send errors as events
         )
         sentry_sdk.init(dsn=SENTRY_DSN_KEY, integrations=[sentry_logging])
-    for kouzaname, site_id, booknum, nums_week in KOUZALIST:
+    for kouzaname, site_id, booknum, weekdays in KOUZALIST:
         try:
-            streamedump(kouzaname, site_id, booknum, nums_week)
+            streamedump(kouzaname, site_id, booknum, weekdays)
         except CommandExecError:
             logger.info(kouzaname + "のダウンロードを中止")
             pass
